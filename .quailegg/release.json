@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "version": "0.1.0-alpha.1",
+  "created_at": "2026-11-16T19:54:45.5383795Z",
+  "mode": "pr",
+  "channel": "alpha",
+  "fingerprint": "sha256:b66d5cb66d6e739208aede2ab6cba4f72136dfbcc6abf9bf525a1a49b6821e26",
+  "repo": {
+    "host": "github.com",
+    "owner": "SuperQuail",
+    "name": "neobot-desktop",
+    "url": "https://github.com/SuperQuail/neobot-desktop"
+  },
+  "verified": {
+    "commands": [
+      "mkdir -p frontend/dist \u0026\u0026 printf '\u003c!doctype html\u003e' \u003e frontend/dist/index.html",
+      "go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1",
+      "wails generate module",
+      "cd frontend \u0026\u0026 npm ci",
+      "cd frontend \u0026\u0026 npm run build",
+      "go test ./..."
+    ],
+    "skipped": false,
+    "at": "2026-11-16T19:54:45.538380151Z"
+  },
+  "packages": [
+    {
+      "name": "go@neobot-desktop",
+      "path": ".",
+      "resolver": "go",
+      "current": "0.0.0",
+      "next": "0.1.0-alpha.1",
+      "bump": "minor",
+      "tag": "v0.1.0-alpha.1",
+      "publish": true
+    },
+    {
+      "name": "npm@frontend",
+      "path": "frontend",
+      "resolver": "npm",
+      "current": "0.0.0",
+      "next": "0.1.0-alpha.1",
+      "bump": "minor",
+      "tag": "v0.1.0-alpha.1",
+      "publish": false
+    }
+  ],
+  "releases": [
+    {
+      "version": "0.1.0-alpha.1",
+      "tag": "v0.1.0-alpha.1",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "prerelease": "alpha"
+    }
+  ],
+  "changes": [
+    {
+      "file": ".changes/desktop-init.md",
+      "type": "feat",
+      "bump": "minor",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "新增 NeoBot 桌面端，可在 Windows 上安装、启动和切换 NeoBot 版本，直接配置 QQ 和模型。",
+      "commit": "c91f2d824be2734776a17c5a5e75b3e49447d982",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/c91f2d824be2734776a17c5a5e75b3e49447d982",
+      "author": "Wsrsq"
+    }
+  ],
+  "qegg": {
+    "version": "0.14.0"
+  }
+}
