@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "0.1.0-alpha.2",
-  "created_at": "2026-11-17T09:05:59.030812486Z",
+  "version": "0.1.0-alpha.3",
+  "created_at": "2026-11-17T11:54:57.518003946Z",
   "mode": "pr",
   "channel": "alpha",
-  "fingerprint": "sha256:4a97a9b7f6b4e945b63836d78594747745c7cfcae64f7e8d8618e5d700127ca9",
+  "fingerprint": "sha256:68c3d00664fa57d6484f6774f203c16b87a555275c23a071f2c3c32caf6a37c6",
   "repo": {
     "host": "github.com",
     "owner": "SuperQuail",
@@ -21,35 +21,35 @@
       "go test ./..."
     ],
     "skipped": false,
-    "at": "2026-11-17T09:05:59.030813094Z"
+    "at": "2026-11-17T11:54:57.518004607Z"
   },
   "packages": [
     {
       "name": "go@neobot-desktop",
       "path": ".",
       "resolver": "go",
-      "current": "0.1.0-alpha.1",
-      "next": "0.1.0-alpha.2",
+      "current": "0.1.0-alpha.2",
+      "next": "0.1.0-alpha.3",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.2",
+      "tag": "v0.1.0-alpha.3",
       "publish": true
     },
     {
       "name": "npm@frontend",
       "path": "frontend",
       "resolver": "npm",
-      "current": "0.1.0-alpha.1",
-      "next": "0.1.0-alpha.2",
+      "current": "0.1.0-alpha.2",
+      "next": "0.1.0-alpha.3",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.2",
+      "tag": "v0.1.0-alpha.3",
       "publish": false
     }
   ],
   "releases": [
     {
-      "version": "0.1.0-alpha.2",
-      "tag": "v0.1.0-alpha.2",
-      "previous_tag": "v0.1.0-alpha.1",
+      "version": "0.1.0-alpha.3",
+      "tag": "v0.1.0-alpha.3",
+      "previous_tag": "v0.1.0-alpha.2",
       "packages": [
         "go@neobot-desktop",
         "npm@frontend"
@@ -83,9 +83,48 @@
       "commit": "c91f2d824be2734776a17c5a5e75b3e49447d982",
       "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/c91f2d824be2734776a17c5a5e75b3e49447d982",
       "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-sources-autosave.md",
+      "type": "feat",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "移除保存按钮，令设置中的下载方案在切换后立即生效。",
+      "commit": "e0be794b8c261fee1b759e316fdf773cf406b6c1",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/e0be794b8c261fee1b759e316fdf773cf406b6c1",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-uv-download.md",
+      "type": "fix",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "修复使用「国内加速」时下载 uv 失败的问题。",
+      "commit": "68740bbd1e03c507f681b09af0814dac034df77c",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/68740bbd1e03c507f681b09af0814dac034df77c",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-version-display.md",
+      "type": "feat",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "添加启动器版本号显示。",
+      "commit": "d410ebf63309ac6ed22b5c2482689ce1f2ade90b",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/d410ebf63309ac6ed22b5c2482689ce1f2ade90b",
+      "author": "Wsrsq"
     }
   ],
   "previous_changes": [
+    ".changes/desktop-accelerated-default.md",
     ".changes/desktop-init.md"
   ],
   "qegg": {
