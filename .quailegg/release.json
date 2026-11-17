@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "0.1.0-alpha.3",
-  "created_at": "2026-11-17T11:54:57.518003946Z",
+  "version": "0.1.0-alpha.4",
+  "created_at": "2026-11-17T17:08:08.5012337Z",
   "mode": "pr",
   "channel": "alpha",
-  "fingerprint": "sha256:68c3d00664fa57d6484f6774f203c16b87a555275c23a071f2c3c32caf6a37c6",
+  "fingerprint": "sha256:f5a89844e5bf6788a8fab7445273012fe5f9115d59f894bbbb990f1c86f04b5c",
   "repo": {
     "host": "github.com",
     "owner": "SuperQuail",
@@ -21,35 +21,35 @@
       "go test ./..."
     ],
     "skipped": false,
-    "at": "2026-11-17T11:54:57.518004607Z"
+    "at": "2026-11-17T17:08:08.501234362Z"
   },
   "packages": [
     {
       "name": "go@neobot-desktop",
       "path": ".",
       "resolver": "go",
-      "current": "0.1.0-alpha.2",
-      "next": "0.1.0-alpha.3",
+      "current": "0.1.0-alpha.3",
+      "next": "0.1.0-alpha.4",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.3",
+      "tag": "v0.1.0-alpha.4",
       "publish": true
     },
     {
       "name": "npm@frontend",
       "path": "frontend",
       "resolver": "npm",
-      "current": "0.1.0-alpha.2",
-      "next": "0.1.0-alpha.3",
+      "current": "0.1.0-alpha.3",
+      "next": "0.1.0-alpha.4",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.3",
+      "tag": "v0.1.0-alpha.4",
       "publish": false
     }
   ],
   "releases": [
     {
-      "version": "0.1.0-alpha.3",
-      "tag": "v0.1.0-alpha.3",
-      "previous_tag": "v0.1.0-alpha.2",
+      "version": "0.1.0-alpha.4",
+      "tag": "v0.1.0-alpha.4",
+      "previous_tag": "v0.1.0-alpha.3",
       "packages": [
         "go@neobot-desktop",
         "npm@frontend"
@@ -82,6 +82,18 @@
       "body": "新增 NeoBot 桌面端，可在 Windows 上安装、启动和切换 NeoBot 版本，直接配置 QQ 和模型。",
       "commit": "c91f2d824be2734776a17c5a5e75b3e49447d982",
       "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/c91f2d824be2734776a17c5a5e75b3e49447d982",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-plugin-dependencies.md",
+      "type": "fix",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "修复安装插件后因为缺少 Python 依赖而加载失败的问题，启动 NeoBot 时会自动补齐。",
+      "commit": "2f148bebf948e6c5b2580a2bab649b2f206cb6ff",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/2f148bebf948e6c5b2580a2bab649b2f206cb6ff",
       "author": "Wsrsq"
     },
     {
@@ -121,11 +133,26 @@
       "commit": "d410ebf63309ac6ed22b5c2482689ce1f2ade90b",
       "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/d410ebf63309ac6ed22b5c2482689ce1f2ade90b",
       "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/plugin-deps-index.md",
+      "type": "fix",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "插件依赖也使用桌面端选定的下载源，选择「国内加速」时不再访问 pypi.org。",
+      "commit": "5af1cf3ac8a9da5daec4914f6893c848aaecbdc2",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/5af1cf3ac8a9da5daec4914f6893c848aaecbdc2",
+      "author": "Wsrsq"
     }
   ],
   "previous_changes": [
     ".changes/desktop-accelerated-default.md",
-    ".changes/desktop-init.md"
+    ".changes/desktop-init.md",
+    ".changes/desktop-sources-autosave.md",
+    ".changes/desktop-uv-download.md",
+    ".changes/desktop-version-display.md"
   ],
   "qegg": {
     "version": "0.14.1"
