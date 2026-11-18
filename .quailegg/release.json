@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "0.1.0-alpha.4",
-  "created_at": "2026-11-17T17:08:08.5012337Z",
+  "version": "0.1.0-alpha.5",
+  "created_at": "2026-11-18T10:37:54.156606438Z",
   "mode": "pr",
   "channel": "alpha",
-  "fingerprint": "sha256:f5a89844e5bf6788a8fab7445273012fe5f9115d59f894bbbb990f1c86f04b5c",
+  "fingerprint": "sha256:72738b29c69d61a10e550af91a4d22bafae294bc1369f96baa924d0d5b02773b",
   "repo": {
     "host": "github.com",
     "owner": "SuperQuail",
@@ -21,35 +21,35 @@
       "go test ./..."
     ],
     "skipped": false,
-    "at": "2026-11-17T17:08:08.501234362Z"
+    "at": "2026-11-18T10:37:54.156606688Z"
   },
   "packages": [
     {
       "name": "go@neobot-desktop",
       "path": ".",
       "resolver": "go",
-      "current": "0.1.0-alpha.3",
-      "next": "0.1.0-alpha.4",
+      "current": "0.1.0-alpha.4",
+      "next": "0.1.0-alpha.5",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.4",
+      "tag": "v0.1.0-alpha.5",
       "publish": true
     },
     {
       "name": "npm@frontend",
       "path": "frontend",
       "resolver": "npm",
-      "current": "0.1.0-alpha.3",
-      "next": "0.1.0-alpha.4",
+      "current": "0.1.0-alpha.4",
+      "next": "0.1.0-alpha.5",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.4",
+      "tag": "v0.1.0-alpha.5",
       "publish": false
     }
   ],
   "releases": [
     {
-      "version": "0.1.0-alpha.4",
-      "tag": "v0.1.0-alpha.4",
-      "previous_tag": "v0.1.0-alpha.3",
+      "version": "0.1.0-alpha.5",
+      "tag": "v0.1.0-alpha.5",
+      "previous_tag": "v0.1.0-alpha.4",
       "packages": [
         "go@neobot-desktop",
         "npm@frontend"
@@ -135,6 +135,19 @@
       "author": "Wsrsq"
     },
     {
+      "file": ".changes/neobot-github-fork.md",
+      "type": "feat",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "支持 Neobot Fork 仓库安装。可在「版本」页右上角安装主仓库或公开 fork 的指定分支，分支名留空时使用所选仓库的默认分支。",
+      "commit": "549b647d6f5c0baf75cddb07ea55228f693a26d3",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/549b647d6f5c0baf75cddb07ea55228f693a26d3",
+      "author": "Wsrsq"
+    },
+    {
       "file": ".changes/plugin-deps-index.md",
       "type": "fix",
       "bump": "patch",
@@ -150,9 +163,11 @@
   "previous_changes": [
     ".changes/desktop-accelerated-default.md",
     ".changes/desktop-init.md",
+    ".changes/desktop-plugin-dependencies.md",
     ".changes/desktop-sources-autosave.md",
     ".changes/desktop-uv-download.md",
-    ".changes/desktop-version-display.md"
+    ".changes/desktop-version-display.md",
+    ".changes/plugin-deps-index.md"
   ],
   "qegg": {
     "version": "0.14.1"
