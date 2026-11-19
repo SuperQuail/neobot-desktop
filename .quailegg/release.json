@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "0.1.0-alpha.5",
-  "created_at": "2026-11-18T10:37:54.156606438Z",
+  "version": "0.1.0-alpha.6",
+  "created_at": "2026-11-19T12:37:11.95598935Z",
   "mode": "pr",
   "channel": "alpha",
-  "fingerprint": "sha256:72738b29c69d61a10e550af91a4d22bafae294bc1369f96baa924d0d5b02773b",
+  "fingerprint": "sha256:1c55ca01a3ece2048327927b9630fe402006f072ae5cfd78e7186a126d4e5044",
   "repo": {
     "host": "github.com",
     "owner": "SuperQuail",
@@ -21,35 +21,35 @@
       "go test ./..."
     ],
     "skipped": false,
-    "at": "2026-11-18T10:37:54.156606688Z"
+    "at": "2026-11-19T12:37:11.955990031Z"
   },
   "packages": [
     {
       "name": "go@neobot-desktop",
       "path": ".",
       "resolver": "go",
-      "current": "0.1.0-alpha.4",
-      "next": "0.1.0-alpha.5",
+      "current": "0.1.0-alpha.5",
+      "next": "0.1.0-alpha.6",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.5",
+      "tag": "v0.1.0-alpha.6",
       "publish": true
     },
     {
       "name": "npm@frontend",
       "path": "frontend",
       "resolver": "npm",
-      "current": "0.1.0-alpha.4",
-      "next": "0.1.0-alpha.5",
+      "current": "0.1.0-alpha.5",
+      "next": "0.1.0-alpha.6",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.5",
+      "tag": "v0.1.0-alpha.6",
       "publish": false
     }
   ],
   "releases": [
     {
-      "version": "0.1.0-alpha.5",
-      "tag": "v0.1.0-alpha.5",
-      "previous_tag": "v0.1.0-alpha.4",
+      "version": "0.1.0-alpha.6",
+      "tag": "v0.1.0-alpha.6",
+      "previous_tag": "v0.1.0-alpha.5",
       "packages": [
         "go@neobot-desktop",
         "npm@frontend"
@@ -72,6 +72,30 @@
       "author": "Wsrsq"
     },
     {
+      "file": ".changes/desktop-app-icon.md",
+      "type": "style",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "更新 Windows 启动器和安装包的图标。",
+      "commit": "483a0463fd372600e92f0de9e644d0b05a561732",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/483a0463fd372600e92f0de9e644d0b05a561732",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-code-signing.md",
+      "type": "build",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "配置证书后，发布流程会自动给 Windows 启动器和安装包签名。",
+      "commit": "acd0cd2801457f98a85f9d1ec18eb46246a72395",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/acd0cd2801457f98a85f9d1ec18eb46246a72395",
+      "author": "Wsrsq"
+    },
+    {
       "file": ".changes/desktop-init.md",
       "type": "feat",
       "bump": "minor",
@@ -85,6 +109,57 @@
       "author": "Wsrsq"
     },
     {
+      "file": ".changes/desktop-installer-chinese.md",
+      "type": "feat",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "支持在简体中文 Windows 上自动显示中文安装向导。",
+      "commit": "56e0618ccd5e1496c2299c5cb11e94716b391105",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/56e0618ccd5e1496c2299c5cb11e94716b391105",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-installer-directory.md",
+      "type": "fix",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "修复再次运行 Windows 安装向导时自定义安装目录被重置为默认目录的问题。",
+      "commit": "62118f0b8cff2bda9dd98f133b5460ee780453b8",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/62118f0b8cff2bda9dd98f133b5460ee780453b8",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-launcher-improvements.md",
+      "type": "feat",
+      "bump": "minor",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "启动器支持自更新，可一键安装推荐版 NeoBot，并在「诊断」页查看完整日志。",
+      "commit": "62118f0b8cff2bda9dd98f133b5460ee780453b8",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/62118f0b8cff2bda9dd98f133b5460ee780453b8",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-launcher-log.md",
+      "type": "feat",
+      "bump": "minor",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "自动保存启动器日志，退出后可在数据根目录的 `logs` 文件夹查看。",
+      "commit": "19ce32c1134da4f44ae52e32436c7a9af80e361a",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/19ce32c1134da4f44ae52e32436c7a9af80e361a",
+      "author": "Wsrsq"
+    },
+    {
       "file": ".changes/desktop-plugin-dependencies.md",
       "type": "fix",
       "bump": "patch",
@@ -94,6 +169,19 @@
       "body": "修复安装插件后因为缺少 Python 依赖而加载失败的问题，启动 NeoBot 时会自动补齐。",
       "commit": "2f148bebf948e6c5b2580a2bab649b2f206cb6ff",
       "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/2f148bebf948e6c5b2580a2bab649b2f206cb6ff",
+      "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-single-instance.md",
+      "type": "feat",
+      "bump": "minor",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "再次打开启动器时，直接显示已有窗口。",
+      "commit": "4104bd49bfd5a23c7cc2136c38cdb58dea4bdc1e",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/4104bd49bfd5a23c7cc2136c38cdb58dea4bdc1e",
       "author": "Wsrsq"
     },
     {
@@ -167,6 +255,7 @@
     ".changes/desktop-sources-autosave.md",
     ".changes/desktop-uv-download.md",
     ".changes/desktop-version-display.md",
+    ".changes/neobot-github-fork.md",
     ".changes/plugin-deps-index.md"
   ],
   "qegg": {
