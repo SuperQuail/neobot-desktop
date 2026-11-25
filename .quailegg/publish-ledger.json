@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "entries": {
+    "1fda1afd939642d9bb42bf506a484f29": {
+      "key": "1fda1afd939642d9bb42bf506a484f29",
+      "identity": {
+        "schema_version": 1,
+        "repo": "github.com/SuperQuail/neobot-desktop",
+        "tags": [
+          "v0.1.0-alpha.8"
+        ],
+        "version": "0.1.0-alpha.8",
+        "channel": "alpha",
+        "mode": "pr",
+        "fingerprint": "sha256:f84ee903cbaaf34f2a27cdae52725fdfcac7c92156b499a6cf97e59e485d709c",
+        "source_commit": "db58370219dc2a55be0fc2a1203bb7b2ca464978"
+      },
+      "run_id": "20261125T121222-7203",
+      "created_at": "2026-11-25T12:12:22.70790678Z",
+      "updated_at": "2026-11-25T12:22:30.698642489Z",
+      "round": {
+        "release_enabled": true
+      },
+      "packages": {
+        "go@neobot-desktop": {
+          "key": {
+            "repo": "github.com/SuperQuail/neobot-desktop",
+            "package": "go@neobot-desktop",
+            "version": "0.1.0-alpha.8",
+            "target": "go"
+          },
+          "resolver": "go",
+          "path": ".",
+          "outcome": "uploaded",
+          "reason": "tag_published",
+          "run_id": "20261125T122212-6297",
+          "started_at": "0001-01-01T00:00:00Z",
+          "finished_at": "2026-11-25T12:22:22.997258754Z"
+        },
+        "npm@frontend": {
+          "key": {
+            "repo": "github.com/SuperQuail/neobot-desktop",
+            "package": "npm@frontend",
+            "version": "0.1.0-alpha.8",
+            "target": "npm"
+          },
+          "resolver": "npm",
+          "path": "frontend",
+          "outcome": "skipped",
+          "reason": "publish_false",
+          "run_id": "20261125T122212-6297",
+          "started_at": "0001-01-01T00:00:00Z",
+          "finished_at": "2026-11-25T12:22:18.17627474Z"
+        }
+      },
+      "steps": {
+        "assets": {
+          "status": "done",
+          "at": "2026-11-25T12:22:15.414873725Z"
+        },
+        "github-release": {
+          "status": "done",
+          "at": "2026-11-25T12:22:28.02244838Z"
+        },
+        "publish": {
+          "status": "done",
+          "at": "2026-11-25T12:22:19.288029182Z"
+        },
+        "push": {
+          "status": "done",
+          "at": "2026-11-25T12:22:24.166994932Z"
+        },
+        "sync": {
+          "status": "done",
+          "at": "2026-11-25T12:22:30.698637692Z"
+        },
+        "tag": {
+          "status": "done",
+          "at": "2026-11-25T12:22:20.418618981Z"
+        }
+      }
+    }
+  }
+}
