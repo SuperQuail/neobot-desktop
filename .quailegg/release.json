@@ -1,10 +1,10 @@
 {
-  "schema_version": 1,
-  "version": "0.1.0-alpha.7",
-  "created_at": "2026-11-21T14:25:38.522960894Z",
+  "schema_version": 2,
+  "version": "0.1.0-alpha.8",
+  "created_at": "2026-11-25T12:13:03.199208157Z",
   "mode": "pr",
   "channel": "alpha",
-  "fingerprint": "sha256:4056b2fd476287e2e144cdf3c2fb5785df80d7e0c6a7db6a5a60a72329c02bfa",
+  "fingerprint": "sha256:f84ee903cbaaf34f2a27cdae52725fdfcac7c92156b499a6cf97e59e485d709c",
   "repo": {
     "host": "github.com",
     "owner": "SuperQuail",
@@ -21,35 +21,35 @@
       "go test ./..."
     ],
     "skipped": false,
-    "at": "2026-11-21T14:25:38.522961465Z"
+    "at": "2026-11-25T12:13:03.199208596Z"
   },
   "packages": [
     {
       "name": "go@neobot-desktop",
       "path": ".",
       "resolver": "go",
-      "current": "0.1.0-alpha.6",
-      "next": "0.1.0-alpha.7",
+      "current": "0.1.0-alpha.7",
+      "next": "0.1.0-alpha.8",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.7",
+      "tag": "v0.1.0-alpha.8",
       "publish": true
     },
     {
       "name": "npm@frontend",
       "path": "frontend",
       "resolver": "npm",
-      "current": "0.1.0-alpha.6",
-      "next": "0.1.0-alpha.7",
+      "current": "0.1.0-alpha.7",
+      "next": "0.1.0-alpha.8",
       "bump": "minor",
-      "tag": "v0.1.0-alpha.7",
+      "tag": "v0.1.0-alpha.8",
       "publish": false
     }
   ],
   "releases": [
     {
-      "version": "0.1.0-alpha.7",
-      "tag": "v0.1.0-alpha.7",
-      "previous_tag": "v0.1.0-alpha.6",
+      "version": "0.1.0-alpha.8",
+      "tag": "v0.1.0-alpha.8",
+      "previous_tag": "v0.1.0-alpha.7",
       "packages": [
         "go@neobot-desktop",
         "npm@frontend"
@@ -147,6 +147,20 @@
       "author": "Wsrsq"
     },
     {
+      "file": ".changes/desktop-kgx.md",
+      "type": "feat",
+      "bump": "patch",
+      "packages": [
+        "go@neobot-desktop"
+      ],
+      "body": "Linux 高级终端新增 GNOME Console（kgx）支持，查找顺序在 konsole 之前。",
+      "commit": "904230865a978108e52597a8396baea8acb40562",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/904230865a978108e52597a8396baea8acb40562",
+      "pull_number": 15,
+      "pull_url": "https://github.com/SuperQuail/neobot-desktop/pull/15",
+      "author": "ABPolaris"
+    },
+    {
       "file": ".changes/desktop-launcher-improvements.md",
       "type": "feat",
       "bump": "minor",
@@ -171,6 +185,21 @@
       "commit": "19ce32c1134da4f44ae52e32436c7a9af80e361a",
       "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/19ce32c1134da4f44ae52e32436c7a9af80e361a",
       "author": "Wsrsq"
+    },
+    {
+      "file": ".changes/desktop-linux.md",
+      "type": "feat",
+      "bump": "minor",
+      "packages": [
+        "go@neobot-desktop",
+        "npm@frontend"
+      ],
+      "body": "新增 Linux x64 支持：可以安装、启动和停止 NeoBot，并使用托盘、开机自启、高级终端、体检与诊断包；Linux 版更新请到发布页手动下载。",
+      "commit": "904230865a978108e52597a8396baea8acb40562",
+      "commit_url": "https://github.com/SuperQuail/neobot-desktop/commit/904230865a978108e52597a8396baea8acb40562",
+      "pull_number": 15,
+      "pull_url": "https://github.com/SuperQuail/neobot-desktop/pull/15",
+      "author": "ABPolaris"
     },
     {
       "file": ".changes/desktop-plugin-dependencies.md",
@@ -275,6 +304,7 @@
   ],
   "previous_changes": [
     ".changes/desktop-accelerated-default.md",
+    ".changes/desktop-advanced-terminal.md",
     ".changes/desktop-app-icon.md",
     ".changes/desktop-code-signing.md",
     ".changes/desktop-init.md",
@@ -288,9 +318,10 @@
     ".changes/desktop-uv-download.md",
     ".changes/desktop-version-display.md",
     ".changes/neobot-github-fork.md",
+    ".changes/plugin-deps-health.md",
     ".changes/plugin-deps-index.md"
   ],
   "qegg": {
-    "version": "0.14.1"
+    "version": "0.15.0"
   }
 }
