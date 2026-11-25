@@ -2,11 +2,12 @@ name: QuailEgg PR
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: ["main"]
+    branches:
+      - "main"
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 concurrency:
   group: qegg-pr-${{ github.event.pull_request.number }}
@@ -15,8 +16,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.head_ref != 'release'
+    timeout-minutes: 25
+    if: "github.event.pull_request.head.repo.full_name != github.repository || github.head_ref != 'release'"
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -24,16 +25,36 @@ jobs:
         with: { go-version: '1.26', cache: true }
       - name: Install qegg
         run: go install github.com/SuperQuail/QuailEgg/cmd/qegg@latest
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1
+      - run: wails build -tags webkit2_41
+      - run: go test ./...
+      - run: env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...
+      - run: env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c -o /tmp/launcher-win.test.exe ./internal/launcher
       - name: Check
         run: qegg check --ci
       - name: Preview
+        id: preview
         shell: bash
-        run: |
-          qegg plan --markdown > plan.md
-          if [ -s plan.md ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none -F plan.md
-          else
-            echo "no pending release; skipping the plan comment"
-          fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          plan="$RUNNER_TEMP/plan.md"
+          qegg plan --markdown > "$plan"
+          if [ -s "$plan" ]; then
+            echo "has_plan=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no pending release"
+          fi
+
+      - name: Upload release plan
+        if: steps.preview.outputs.has_plan == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qegg-pr-plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/plan.md
+          if-no-files-found: error
+          retention-days: 3

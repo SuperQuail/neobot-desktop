@@ -7,6 +7,7 @@ The structure is:
 * bin - Output directory
 * darwin - macOS specific files
 * windows - Windows specific files
+* linux - Linux 打包文件（桌面入口、图标、安装/卸载与打包脚本）
 
 ## Mac
 
@@ -19,6 +20,16 @@ The directory contains the following files:
 
 - `Info.plist` - the main plist file used for Mac builds. It is used when building using `wails build`.
 - `Info.dev.plist` - same as the main plist file but used when building using `wails dev`.
+
+## Linux
+
+The `linux` directory contains packaging files for Linux x64 builds:
+
+- `neobot-desktop.desktop.in` - desktop entry template; `install.sh` fills in the absolute executable path
+- `icons/hicolor/<size>/apps/neobot-desktop.png` - application icons
+- `install.sh` / `uninstall.sh` - user-level installation without root
+- `package.sh` - build `build/bin/neobot-desktop-linux-amd64.tar.gz` after `wails build -tags webkit2_41`
+- `README.txt` - instructions shipped inside the tarball
 
 ## Windows
 

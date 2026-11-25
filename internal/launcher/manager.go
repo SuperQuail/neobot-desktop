@@ -20,13 +20,13 @@ import (
 const (
 	// Intentionally empty until a published build passes the Windows end-to-end release gate.
 	recommendedVersion = ""
-	// Bumping uvVersion also requires updating uvWheelSHA256 and uvArchiveSHA256 in
-	// install.go, and confirming the mirror already carries that wheel and that the
-	// wheel still stores uv.exe at uvWheelEntry; otherwise accelerated installs fail
-	// with "uv 下载不完整或校验失败" (stale digest) or "下载源没有提供 uv <版本>"
-	// (missing wheel), and official installs fail with the same digest error.
+	// Bumping uvVersion also requires updating uvWheelSHA256 and uvArchiveSHA256
+	// in uv_<platform>.go, and confirming the mirror already carries that wheel
+	// and that the wheel still stores uv at uvWheelEntry; otherwise accelerated
+	// installs fail with "uv 下载不完整或校验失败" (stale digest) or
+	// "下载源没有提供 uv <版本>" (missing wheel), and official installs fail with
+	// the same digest error.
 	uvVersion     = "0.12.9"
-	uvArchive     = "uv-x86_64-pc-windows-msvc.zip"
 	officialUV    = "https://github.com/astral-sh/uv/releases/download"
 	officialIndex = "https://pypi.org/simple"
 	mirrorPython  = "https://mirror.nju.edu.cn/github-release/astral-sh/python-build-standalone"
@@ -427,7 +427,7 @@ func (m *Manager) versionDir(version string) string {
 	return filepath.Join(m.root, "versions", version)
 }
 func (m *Manager) binary(version string) string {
-	return filepath.Join(m.versionDir(version), "Scripts", "neobot.exe")
+	return botExecutable(m.versionDir(version))
 }
 func (m *Manager) Close() {
 	m.mu.Lock()
@@ -490,8 +490,12 @@ func writeJSON(path string, value any) error {
 	return replaceFile(file.Name(), path)
 }
 
-func supported() bool { return runtime.GOOS == "windows" && runtime.GOARCH == "amd64" }
-func timeID() string  { return strconv.FormatInt(time.Now().UnixNano(), 10) }
+// supported 报告当前平台是否支持安装与运行 NeoBot。Windows 与 Linux x64 已实现；
+// 其他平台仍然只保留只读界面。
+func supported() bool {
+	return (runtime.GOOS == "windows" || runtime.GOOS == "linux") && runtime.GOARCH == "amd64"
+}
+func timeID() string { return strconv.FormatInt(time.Now().UnixNano(), 10) }
 
 // cleanVersionTrash 清理卸载版本时中断留下的中转目录。
 // 卸载走 rename-then-delete，进程如果在中间被杀就会留下 <name>.trash-<纳秒>；

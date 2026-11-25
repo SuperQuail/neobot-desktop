@@ -1,8 +1,10 @@
 package launcher
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,6 +22,39 @@ import (
 	"testing"
 	"time"
 )
+
+func TestCopyDataKeepsExecutableBit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 没有可执行位")
+	}
+	source := filepath.Join(t.TempDir(), "data")
+	if err := os.MkdirAll(filepath.Join(source, "sub"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(source, "sub", "run.sh")
+	regular := filepath.Join(source, "config.toml")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(regular, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "copy")
+	if err := copyData(source, target); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(target, "sub", "run.sh"))
+	if err != nil || info.Mode().Perm()&0111 == 0 {
+		t.Fatalf("copied script mode = %v, %v; want executable bit", info, err)
+	}
+	info, err = os.Stat(filepath.Join(target, "config.toml"))
+	if err != nil || info.Mode().Perm()&0111 != 0 {
+		t.Fatalf("copied regular file mode = %v, %v; want no executable bit", info, err)
+	}
+	if info, err := os.Stat(filepath.Join(target, "sub")); err != nil || info.Mode().Perm() != 0700 {
+		t.Fatalf("copied directory mode = %v, %v; want 0700", info, err)
+	}
+}
 
 func TestVersionSwitchBacksUpAndRestoresCompatibleData(t *testing.T) {
 	root := t.TempDir()
@@ -182,6 +217,180 @@ func buildZip(t *testing.T, entries map[string]string) []byte {
 // the GitHub zip is flat (uv.exe at the root) and the wheel keeps it under
 // uv-<version>.data/scripts/. This case is self-referential, so it cannot catch
 // a wrong constant.
+// buildTarGz 构造一个只含普通文件的 tar.gz，用来覆盖 Linux 官方源的发行包格式。
+func buildTarGz(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	writer := tar.NewWriter(gz)
+	for name, content := range entries {
+		header := &tar.Header{Name: name, Mode: 0755, Size: int64(len(content)), Typeflag: tar.TypeReg}
+		if err := writer.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := writer.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// TestUVArchiveExtractsFromTarGz 覆盖 Linux 官方源：uv 以 .tar.gz 发布，解压后
+// 必须补上可执行位。
+func TestUVArchiveExtractsFromTarGz(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "uv.tar.gz")
+	if err := os.WriteFile(archive, buildTarGz(t, map[string]string{
+		uvArchiveEntry: "tar uv",
+		"other/uv":     "wrong",
+	}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "uv")
+	if err := extractUV(archive, target, uvArchiveEntry); err != nil {
+		t.Fatal(err)
+	}
+	if content, err := os.ReadFile(target); err != nil || string(content) != "tar uv" {
+		t.Fatalf("extracted %q, %v; want %q", content, err, "tar uv")
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm()&0111 == 0 {
+			t.Fatalf("extracted uv is not executable: %v", info.Mode())
+		}
+	}
+}
+
+// TestRealLinuxInstallProvisionsVenv 需要真实网络和较多磁盘空间，默认跳过。
+// 它跑完 uv、托管 Python、venv 与 pip install 的完整安装链，确认 Linux 上
+// bin/python 和 bin/neobot 都能生成。
+func TestRealLinuxInstallProvisionsVenv(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux end-to-end test")
+	}
+	if os.Getenv("NEOBOT_INSTALL_E2E") == "" {
+		t.Skip("set NEOBOT_INSTALL_E2E=1 to install NeoBot from the real index")
+	}
+	version := strings.TrimSpace(os.Getenv("NEOBOT_INSTALL_VERSION"))
+	if version == "" {
+		version = "2.0.1"
+	}
+	root := t.TempDir()
+	m := &Manager{root: root, installed: map[string]Version{}}
+	sources := Sources{Preset: "accelerated", UV: officialUV, Python: mirrorPython, Index: officialIndex}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer cancel()
+	if err := m.install(ctx, version, sources); err != nil {
+		t.Fatal(err)
+	}
+	dir := m.versionDir(version)
+	python := venvPython(dir)
+	if !isFile(python) {
+		t.Fatalf("missing venv python at %s", python)
+	}
+	if !isFile(botExecutable(dir)) {
+		t.Fatalf("missing NeoBot entry point at %s", botExecutable(dir))
+	}
+	out, err := exec.Command(python, "-c", "import neobot_app; print(neobot_app.__file__)").CombinedOutput()
+	if err != nil {
+		t.Fatalf("installed interpreter cannot import neobot_app: %v\n%s", err, out)
+	}
+}
+
+// TestRealLinuxStartStop 需要真实网络，默认跳过。它安装官方发行版并真正启动
+// NeoBot，确认 Linux 上进程组接管、本机控制接口与强制停止都能工作。
+func TestRealLinuxStartStop(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux end-to-end test")
+	}
+	if os.Getenv("NEOBOT_START_E2E") == "" {
+		t.Skip("set NEOBOT_START_E2E=1 to install and start NeoBot")
+	}
+	version := "2.0.1"
+	root := t.TempDir()
+	m, err := Open(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	sources := Sources{Preset: "accelerated", UV: officialUV, Python: mirrorPython, Index: officialIndex}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer cancel()
+	if err := m.install(ctx, version, sources); err != nil {
+		t.Fatal(err)
+	}
+	m.mu.Lock()
+	m.installed[version] = versionOf(version)
+	m.state.Selected = version
+	m.mu.Unlock()
+	if err := m.Start(false); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(90 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshot := m.Snapshot()
+		if snapshot.Running == version && snapshot.DashboardURL != "" {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	snapshot := m.Snapshot()
+	if snapshot.Running != version || snapshot.DashboardURL == "" {
+		logs := m.Logs(0)
+		t.Fatalf("NeoBot did not become ready: running=%q dashboard=%q error=%q logs=%v",
+			snapshot.Running, snapshot.DashboardURL, snapshot.RuntimeError, logs.Lines)
+	}
+	if err := m.Stop(true); err != nil {
+		t.Fatal(err)
+	}
+	if running := m.Snapshot().Running; running != "" {
+		t.Fatalf("NeoBot is still running after stop: %q", running)
+	}
+}
+
+// TestRealUVProvisionsBothPresets 需要真实网络，默认跳过。它验证官方源的
+// .tar.gz、加速源的 manylinux wheel 都能通过 SHA256 校验、解压并执行。
+func TestRealUVProvisionsBothPresets(t *testing.T) {
+	if os.Getenv("NEOBOT_UV_E2E") == "" {
+		t.Skip("set NEOBOT_UV_E2E=1 to download uv from the real sources")
+	}
+	for _, test := range []struct {
+		name    string
+		sources Sources
+	}{
+		// 官方源走 GitHub 的 .tar.gz。
+		{"official", defaultSources("official")},
+		// 加速源走 manylinux wheel；这里直接用 pypi.org，避免镜像的访问策略影响测试。
+		{"accelerated", Sources{Preset: "accelerated", Index: officialIndex}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			m := &Manager{root: t.TempDir()}
+			if err := os.MkdirAll(filepath.Join(m.root, "tools"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			uv, err := m.ensureUV(ctx, test.sources)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := exec.Command(uv, "--version").Output()
+			if err != nil || !strings.Contains(string(out), "uv "+uvVersion) {
+				t.Fatalf("uv --version = %q, %v", out, err)
+			}
+		})
+	}
+}
+
 func TestUVArchiveExtractsOnlyPinnedExecutable(t *testing.T) {
 	dir := t.TempDir()
 	archive := filepath.Join(dir, "uv.zip")
@@ -217,7 +426,7 @@ func TestUVArchiveExtractsOnlyPinnedExecutable(t *testing.T) {
 	if err := os.WriteFile(other, buildZip(t, map[string]string{uvArchiveEntry: "archive"}), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := extractUV(other, filepath.Join(dir, "missing.exe"), uvWheelEntry); err == nil || !strings.Contains(err.Error(), "压缩包缺少 uv.exe") {
+	if err := extractUV(other, filepath.Join(dir, "missing.exe"), uvWheelEntry); err == nil || !strings.Contains(err.Error(), "压缩包缺少 uv 可执行文件") {
 		t.Fatalf("missing entry was not reported: %v", err)
 	}
 }
@@ -226,7 +435,7 @@ func TestAcceleratedUVComesFromMirroredWheel(t *testing.T) {
 	wheel := buildZip(t, map[string]string{uvWheelEntry: "wheel uv"})
 	sum := sha256.Sum256(wheel)
 	win32 := "uv-" + uvVersion + "-py3-none-win32.whl"
-	name := "uv-" + uvVersion + "-py3-none-win_amd64.whl"
+	name := uvWheelFile
 	serve := func(withWheel bool) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
@@ -253,7 +462,7 @@ func TestAcceleratedUVComesFromMirroredWheel(t *testing.T) {
 	if _, err := manager.ensureUV(context.Background(), accelerated); err == nil || !strings.Contains(err.Error(), "下载源没有提供 uv "+uvVersion) {
 		t.Fatalf("index without the wheel was not reported: %v", err)
 	}
-	if isFile(filepath.Join(manager.root, "tools", "uv-"+uvVersion+".exe")) {
+	if isFile(uvExecutable(manager.root)) {
 		t.Fatal("failed uv install published an executable")
 	}
 
@@ -294,7 +503,7 @@ func TestAcceleratedUVComesFromMirroredWheel(t *testing.T) {
 
 func TestAcceleratedUVUsesIndexWheel(t *testing.T) {
 	win32 := "uv-" + uvVersion + "-py3-none-win32.whl"
-	name := "uv-" + uvVersion + "-py3-none-win_amd64.whl"
+	name := uvWheelFile
 	yanked := "uv-" + uvVersion + "-1-py3-none-win_amd64.whl"
 	serve := func(contentType, body string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -377,7 +586,7 @@ func TestAcceleratedUVUsesIndexWheel(t *testing.T) {
 }
 
 func TestSimpleFilesResolvesLinksAgainstFinalURL(t *testing.T) {
-	name := "uv-" + uvVersion + "-py3-none-win_amd64.whl"
+	name := uvWheelFile
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/uv/":
@@ -418,7 +627,7 @@ func TestResolveLinkRejectsNonWebSchemes(t *testing.T) {
 		}
 	}
 	for _, test := range []struct{ link, want string }{
-		{"../../packages/uv-0.12.9-py3-none-win_amd64.whl", "https://mirror.example.com/packages/uv-0.12.9-py3-none-win_amd64.whl"},
+		{"../../packages/" + uvWheelFile, "https://mirror.example.com/packages/" + uvWheelFile},
 		{"//cdn.example.com/uv.whl", "https://cdn.example.com/uv.whl"},
 		{"https://other.example.com/uv.whl", "https://other.example.com/uv.whl"},
 	} {
@@ -483,7 +692,7 @@ func TestEnsureUVAcceleratedInstallsFromWheel(t *testing.T) {
 	uvWheelSHA256 = hex.EncodeToString(sum[:])
 	t.Cleanup(func() { uvWheelSHA256 = original })
 
-	name := "uv-" + uvVersion + "-py3-none-win_amd64.whl"
+	name := uvWheelFile
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/uv/":
@@ -507,7 +716,7 @@ func TestEnsureUVAcceleratedInstallsFromWheel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join(root, "tools", "uv-"+uvVersion+".exe"); uv != want {
+	if want := uvExecutable(root); uv != want {
 		t.Fatalf("uv = %q; want %q", uv, want)
 	}
 	if content, err := os.ReadFile(uv); err != nil || string(content) != "wheel uv" {
@@ -559,7 +768,7 @@ func TestEnsureUVRemovesStaleTemporaryFiles(t *testing.T) {
 }
 
 func TestEnsureUVDispatch(t *testing.T) {
-	name := "uv-" + uvVersion + "-py3-none-win_amd64.whl"
+	name := uvWheelFile
 	var mu sync.Mutex
 	var paths []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -599,10 +808,10 @@ func TestEnsureUVDispatch(t *testing.T) {
 	if _, err := m.ensureUV(context.Background(), Sources{Preset: "official", UV: server.URL}); err == nil {
 		t.Fatal("official uv install accepted an unverified container")
 	}
-	if got, want := recorded(), "/"+uvVersion+"/"+uvArchive; got != want {
+	if got, want := recorded(), "/"+uvVersion+"/"+uvArchiveFile; got != want {
 		t.Fatalf("official requests = %q; want %q", got, want)
 	}
-	if isFile(filepath.Join(root, "tools", "uv-"+uvVersion+".exe")) {
+	if isFile(uvExecutable(root)) {
 		t.Fatal("failed uv install published an executable")
 	}
 }
@@ -613,7 +822,7 @@ func TestEnsureUVReusesInstalledExecutable(t *testing.T) {
 	if err := os.MkdirAll(toolsDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	installed := filepath.Join(toolsDir, "uv-"+uvVersion+".exe")
+	installed := uvExecutable(root)
 	if err := os.WriteFile(installed, []byte("installed"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -634,8 +843,8 @@ func TestEnsureUVReusesInstalledExecutable(t *testing.T) {
 }
 
 func TestOpenDefaultsToAcceleratedSources(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("实例锁仅由 Windows 实现")
+	if !supported() {
+		t.Skip("实例锁仅在支持的平台实现")
 	}
 	m, err := Open(filepath.Join(t.TempDir(), "data"), nil)
 	if err != nil {
@@ -648,8 +857,8 @@ func TestOpenDefaultsToAcceleratedSources(t *testing.T) {
 }
 
 func TestOpenKeepsSavedOfficialSources(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("实例锁仅由 Windows 实现")
+	if !supported() {
+		t.Skip("实例锁仅在支持的平台实现")
 	}
 	root := filepath.Join(t.TempDir(), "data")
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -670,8 +879,8 @@ func TestOpenKeepsSavedOfficialSources(t *testing.T) {
 }
 
 func TestOpenUpgradesSavedAcceleratedIndex(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("实例锁仅由 Windows 实现")
+	if !supported() {
+		t.Skip("实例锁仅在支持的平台实现")
 	}
 	root := filepath.Join(t.TempDir(), "data")
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -693,8 +902,8 @@ func TestOpenUpgradesSavedAcceleratedIndex(t *testing.T) {
 }
 
 func TestOpenMigratesSettingsWithoutSources(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("实例锁仅由 Windows 实现")
+	if !supported() {
+		t.Skip("实例锁仅在支持的平台实现")
 	}
 	root := filepath.Join(t.TempDir(), "data")
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -751,7 +960,7 @@ func TestWindowsSupervisesSuspendedProcess(t *testing.T) {
 	}
 	cmd := exec.Command("cmd.exe", "/c", "echo started")
 	hideWindow(cmd)
-	suspendAtLaunch(cmd)
+	prepareLaunch(cmd)
 	var output strings.Builder
 	cmd.Stdout = &output
 	if err := cmd.Start(); err != nil {

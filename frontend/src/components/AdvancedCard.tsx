@@ -44,12 +44,12 @@ export function AdvancedCard() {
             okText: '我了解，打开终端',
             cancelText: '取消',
             content: <div className="terminal-warning">
-                <p>这个终端是普通 Windows 命令行，不是沙箱。</p>
+                <p>这个终端是普通系统终端，不是沙箱。</p>
                 <ul>
-                    <li>它拥有当前账户的权限，可以读写 <code>data\.env</code> 和
-                        <code>data\.neobot\control.json</code> 中的凭据。</li>
+                    <li>它拥有当前账户的权限，可以读写 <code>data/.env</code> 和
+                        <code>data/.neobot/control.json</code> 中的凭据。</li>
                     <li>修改 Python 环境前请先停止 NeoBot；NeoBot 运行期间不要启动第二个实例。</li>
-                    <li>修复或更新可能重置你对 venv 的手动修改；不要手删 <code>versions\</code> 和
+                    <li>修复或更新可能重置你对 venv 的手动修改；不要手删 <code>versions/</code> 和
                         <code>settings.json</code>。</li>
                 </ul>
                 <p>确认后不再重复提示。</p>
@@ -80,8 +80,8 @@ export function AdvancedCard() {
         {notice && <Alert className="advanced-notice" type="warning" showIcon closable
             title="终端使用提示"
             description={<>
-                终端拥有当前账户权限，不是沙箱；<code>data\.env</code> 和
-                <code>data\.neobot\control.json</code> 含凭据；修改环境前先停止 NeoBot，
+                终端拥有当前账户权限，不是沙箱；<code>data/.env</code> 和
+                <code>data/.neobot/control.json</code> 含凭据；修改环境前先停止 NeoBot，
                 不要同时启动第二个实例；修复/更新可能重置你对 venv 的改动。
             </>}
             onClose={() => setNotice(false)} />}

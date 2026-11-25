@@ -57,10 +57,10 @@ func TestBranchInstallRecordScanning(t *testing.T) {
 	m := Manager{root: root, installed: map[string]Version{}}
 	makeInstall := func(name string, record installRecord) {
 		dir := filepath.Join(root, "versions", name)
-		if err := os.MkdirAll(filepath.Join(dir, "Scripts"), 0700); err != nil {
+		if err := os.MkdirAll(venvBin(filepath.Join(dir)), 0700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "Scripts", "neobot.exe"), []byte("x"), 0600); err != nil {
+		if err := os.WriteFile(botExecutable(filepath.Join(dir)), []byte("x"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		if err := writeInstallRecord(dir, record); err != nil {
@@ -189,6 +189,62 @@ func TestExtractBranchSource(t *testing.T) {
 	}
 	if !isFile(filepath.Join(workspace, "app", "pyproject.toml")) {
 		t.Fatal("workspace files were not extracted")
+	}
+}
+
+func TestExtractBranchSourceKeepsExecutableBit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows 没有可执行位")
+	}
+	root := t.TempDir()
+	archive := filepath.Join(root, "source.zip")
+	file, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	for _, entry := range []struct {
+		name string
+		mode os.FileMode
+		body string
+	}{
+		{"NeoBot-dev/pyproject.toml", 0644, "[project]\nname='neobot'\n"},
+		{"NeoBot-dev/app/pyproject.toml", 0755, "[project]\nname='neobot-app'\n"},
+		{"NeoBot-dev/packages/keep/pyproject.toml", 0644, "[project]\n"},
+		{"NeoBot-dev/packages/keep/run.sh", 0755, "#!/bin/sh\n"},
+	} {
+		header := &zip.FileHeader{Name: entry.name, Method: zip.Store}
+		header.SetMode(entry.mode)
+		part, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := part.Write([]byte(entry.body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err := extractBranchSource(context.Background(), archive, filepath.Join(root, "src"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, wantExec := range map[string]bool{
+		filepath.Join(workspace, "app", "pyproject.toml"):              true,
+		filepath.Join(workspace, "packages", "keep", "run.sh"):         true,
+		filepath.Join(workspace, "packages", "keep", "pyproject.toml"): false,
+	} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := info.Mode().Perm()&0111 != 0; got != wantExec {
+			t.Fatalf("%s executable = %v; want %v (mode %v)", path, got, wantExec, info.Mode())
+		}
 	}
 }
 
@@ -387,10 +443,10 @@ func TestRecoverVersionDirs(t *testing.T) {
 	m := Manager{root: root, installed: map[string]Version{}}
 	makeInstallAt := func(dir, name string) {
 		t.Helper()
-		if err := os.MkdirAll(filepath.Join(dir, "Scripts"), 0700); err != nil {
+		if err := os.MkdirAll(venvBin(filepath.Join(dir)), 0700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "Scripts", "neobot.exe"), []byte("x"), 0600); err != nil {
+		if err := os.WriteFile(botExecutable(filepath.Join(dir)), []byte("x"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		if err := writeInstallRecord(dir, installRecord{Name: name}); err != nil {
@@ -423,7 +479,7 @@ func TestRecoverVersionDirs(t *testing.T) {
 	if err := m.recoverVersionDirs(); err != nil {
 		t.Fatal(err)
 	}
-	if !isFile(filepath.Join(restoreDir, "Scripts", "neobot.exe")) || isDir(restoreOld) {
+	if !isFile(botExecutable(filepath.Join(restoreDir))) || isDir(restoreOld) {
 		t.Fatal("missing install was not restored from the old directory")
 	}
 
@@ -454,8 +510,8 @@ func TestRecoverVersionDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	broken, _ := filepath.Glob(fileTarget + ".broken-*")
-	if !isFile(filepath.Join(fileTarget, "Scripts", "neobot.exe")) || len(broken) != 1 {
-		t.Fatalf("file target was not recovered: binary=%v broken=%v", isFile(filepath.Join(fileTarget, "Scripts", "neobot.exe")), broken)
+	if !isFile(botExecutable(filepath.Join(fileTarget))) || len(broken) != 1 {
+		t.Fatalf("file target was not recovered: binary=%v broken=%v", isFile(botExecutable(filepath.Join(fileTarget))), broken)
 	}
 
 	multi := branchID("multi")
@@ -481,10 +537,10 @@ func TestRecoverVersionDirs(t *testing.T) {
 
 	corrupt := branchID("corrupt")
 	corruptTarget := filepath.Join(versions, corrupt)
-	if err := os.MkdirAll(filepath.Join(corruptTarget, "Scripts"), 0700); err != nil {
+	if err := os.MkdirAll(venvBin(filepath.Join(corruptTarget)), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(corruptTarget, "Scripts", "neobot.exe"), []byte("x"), 0600); err != nil {
+	if err := os.WriteFile(botExecutable(filepath.Join(corruptTarget)), []byte("x"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(corruptTarget, ".installed"), []byte("{broken"), 0600); err != nil {
@@ -560,8 +616,8 @@ func TestUnderscoreBranchDoesNotTouchDataVersion(t *testing.T) {
 }
 
 func TestOpenDropsInvalidDataVersion(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("实例锁仅由 Windows 实现")
+	if !supported() {
+		t.Skip("实例锁仅在支持的平台实现")
 	}
 	root := t.TempDir()
 	if err := writeJSON(filepath.Join(root, "settings.json"), diskState{
@@ -586,10 +642,10 @@ func TestOpenDropsInvalidDataVersion(t *testing.T) {
 func TestInstalledReleaseWithoutRecord(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "versions", "1.2.3")
-	if err := os.MkdirAll(filepath.Join(dir, "Scripts"), 0700); err != nil {
+	if err := os.MkdirAll(venvBin(filepath.Join(dir)), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "Scripts", "neobot.exe"), []byte("x"), 0600); err != nil {
+	if err := os.WriteFile(botExecutable(filepath.Join(dir)), []byte("x"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	m := Manager{root: root, installed: map[string]Version{}}

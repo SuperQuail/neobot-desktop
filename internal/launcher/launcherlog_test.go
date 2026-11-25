@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -90,8 +89,8 @@ func TestLauncherLogWritesAndKeepsRetention(t *testing.T) {
 // 这是一整条链路（startLauncherLog → sink → appendLauncherLog），单元函数分别测过，
 // 但只有从这里能确认它们被接起来了。
 func TestOpenWiresSinkToLauncherLog(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("实例锁仅由 Windows 实现")
+	if !supported() {
+		t.Skip("实例锁仅在支持的平台实现")
 	}
 	root := t.TempDir()
 	m, err := Open(root, nil)

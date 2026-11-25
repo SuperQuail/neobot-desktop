@@ -45,3 +45,8 @@ func removeAutostartEntry() error {
 	}
 	return nil
 }
+
+// autostartErrorHint 给 SetAutostart 的错误补一句平台相关的排查建议。
+func autostartErrorHint() string {
+	return "；多为安全软件拦截了注册表写入，请允许后重试"
+}

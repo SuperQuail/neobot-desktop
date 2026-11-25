@@ -155,9 +155,24 @@ func TestUpdateDetectsNewerRelease(t *testing.T) {
 	}
 }
 
+// withWindowsUpdateAssets 在非 Windows 平台上把更新资产切回 Windows 的配置，
+// 这样资产选择、下载与校验逻辑仍然能在 Linux CI 上覆盖；测试结束恢复。
+func withWindowsUpdateAssets(t *testing.T) {
+	t.Helper()
+	previousName, previousSuffix := updateAssetName, updateAssetSuffix
+	previousChecksum, previousAuto := updateChecksumName, updateAutoInstall
+	updateAssetName, updateAssetSuffix = "neobot-desktop-amd64-installer.exe", "-installer.exe"
+	updateChecksumName, updateAutoInstall = "checksums.txt", true
+	t.Cleanup(func() {
+		updateAssetName, updateAssetSuffix = previousName, previousSuffix
+		updateChecksumName, updateAutoInstall = previousChecksum, previousAuto
+	})
+}
+
 // ── 发布信息解析 ─────────────────────────────────────────────────
 
 func TestUpdatePicksInstallerAssetsAndTruncatesNotes(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	updateTestVersion(t, "1.0.0")
 	var base string
 	updateTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -194,6 +209,7 @@ func TestUpdatePicksInstallerAssetsAndTruncatesNotes(t *testing.T) {
 }
 
 func TestUpdateFallsBackToInstallerSuffix(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	updateTestVersion(t, "1.0.0")
 	var base string
 	updateTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -216,6 +232,7 @@ func TestUpdateFallsBackToInstallerSuffix(t *testing.T) {
 }
 
 func TestUpdateRejectsInsecureAssetURL(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	updateTestVersion(t, "1.0.0")
 	updateTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -447,6 +464,7 @@ func updateTestDownloadServer(t *testing.T, content, checksums []byte) (installe
 }
 
 func TestDownloadUpdateWritesAndVerifiesInstaller(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	content := []byte("NSIS installer fixture")
 	sum := sha256.Sum256(content)
 	checksums := []byte(hex.EncodeToString(sum[:]) + "  " + updateAssetName + "\n" +
@@ -488,6 +506,7 @@ func TestDownloadUpdateWritesAndVerifiesInstaller(t *testing.T) {
 }
 
 func TestDownloadUpdateRejectsBadChecksum(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	content := []byte("NSIS installer fixture")
 	checksums := []byte(strings.Repeat("0", 64) + "  " + updateAssetName + "\n")
 	installerURL, checksumsURL := updateTestDownloadServer(t, content, checksums)
@@ -506,6 +525,7 @@ func TestDownloadUpdateRejectsBadChecksum(t *testing.T) {
 }
 
 func TestDownloadUpdateRejectsChecksumsWithoutInstaller(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	content := []byte("NSIS installer fixture")
 	checksums := []byte(strings.Repeat("a", 64) + "  neobot-desktop-amd64.zip\n")
 	installerURL, checksumsURL := updateTestDownloadServer(t, content, checksums)
@@ -517,6 +537,7 @@ func TestDownloadUpdateRejectsChecksumsWithoutInstaller(t *testing.T) {
 }
 
 func TestDownloadUpdateRejectsOversizedInstaller(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	installerURL, _ := updateTestDownloadServer(t, []byte("too large"), nil)
 	previous := maxUpdateBytes
 	maxUpdateBytes = 4
@@ -540,6 +561,7 @@ func TestDownloadUpdateNeedsAssetURL(t *testing.T) {
 }
 
 func TestDownloadUpdateReportsHTTPFailure(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	var base string
 	updateTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
@@ -551,9 +573,44 @@ func TestDownloadUpdateReportsHTTPFailure(t *testing.T) {
 	}
 }
 
+// TestLinuxUpdateDoesNotOfferWindowsInstaller 验证 Linux 不会把 Windows 安装包
+// 当成可下载资产；更新卡片应引导用户到发布页手动下载。
+func TestLinuxUpdateDoesNotOfferWindowsInstaller(t *testing.T) {
+	if updateAutoInstall {
+		t.Skip("仅验证非自动更新平台")
+	}
+	updateTestVersion(t, "1.0.0")
+	var base string
+	updateTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/releases/latest":
+			assets := `{"name":"neobot-desktop-amd64-installer.exe","browser_download_url":"` + base + `/download/neobot-desktop-amd64-installer.exe"},` +
+				`{"name":"checksums.txt","browser_download_url":"` + base + `/download/checksums.txt"}`
+			_, _ = io.WriteString(w, updateTestRelease("v1.1.0", "", assets))
+		case "/recommended.json":
+			_, _ = io.WriteString(w, updateTestEmptyRecommended)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	base = strings.TrimSuffix(strings.TrimSpace(githubLatestReleaseURL), "/releases/latest")
+
+	status := updateTestCheck(t, &Manager{root: t.TempDir()})
+	if status.Error != "" {
+		t.Fatal(status.Error)
+	}
+	if !status.Available {
+		t.Fatal("newer release should still be reported as available")
+	}
+	if status.AutoUpdate || status.AssetURL != "" || status.ChecksumsURL != "" {
+		t.Fatalf("Linux offered an installer: auto=%v asset=%q checksums=%q", status.AutoUpdate, status.AssetURL, status.ChecksumsURL)
+	}
+}
+
 // ── 启动安装包 ───────────────────────────────────────────────────
 
 func TestLaunchUpdateNeedsDownloadedInstaller(t *testing.T) {
+	withWindowsUpdateAssets(t)
 	m := &Manager{root: t.TempDir()}
 	if err := m.LaunchUpdate(); err == nil || !strings.Contains(err.Error(), "请先下载") {
 		t.Fatalf("没有安装包时的错误 = %v", err)

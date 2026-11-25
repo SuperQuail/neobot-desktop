@@ -38,7 +38,7 @@ export function SupervisorCard() {
             disabled={!trayReady}
             onChange={enabled => void action(() => SetCloseToTray(enabled))} />
         <SettingRow title="跟随系统登录启动"
-            hint="登录 Windows 后自动启动启动器并留在托盘，不会弹出主窗口。"
+            hint="登录系统后自动启动启动器并留在托盘，不会弹出主窗口。"
             checked={supervisor.autostart}
             onChange={enabled => void action(() => SetAutostart(enabled))} />
         <SettingRow title="崩溃后自动重启"

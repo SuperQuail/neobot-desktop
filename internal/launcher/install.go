@@ -1,7 +1,9 @@
 package launcher
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,21 +22,11 @@ import (
 )
 
 const (
-	// Both sources ship the same uv.exe; each is pinned to the digest of the
-	// container it downloads.
-	uvArchiveEntry  = "uv.exe"
-	uvArchiveSHA256 = "ddbfcee1ac615a0499f6aa97b5ec8ebdf3ee4a7714a48055ec2ba0030e3cf810"
-	uvWheelEntry    = "uv-" + uvVersion + ".data/scripts/uv.exe"
+	// userAgent identifies the launcher to mirrors. Some of them reject requests
+	// carrying Go's default User-Agent ("Go-http-client/1.1") on their file paths,
+	// so every download names the launcher instead.
+	userAgent = "NeoBot-Desktop"
 )
-
-// uvWheelSHA256 is the digest of the PyPI wheel. It is a variable so tests can
-// install from a fixture wheel; production code never writes it.
-var uvWheelSHA256 = "871e884c3329f69c12bb7426edb9e727745c3bb2db6d9e0538ce0e1bdfb64916"
-
-// userAgent identifies the launcher to mirrors. Some of them reject requests
-// carrying Go's default User-Agent ("Go-http-client/1.1") on their file paths,
-// so every download names the launcher instead.
-const userAgent = "NeoBot-Desktop"
 
 type userAgentTransport struct{ base http.RoundTripper }
 
@@ -199,8 +191,8 @@ func resolveLink(base *url.URL, link string) *url.URL {
 	return u
 }
 
-// uvWheelURL finds the Windows x64 wheel of the pinned uv release on a PEP 503
-// index. The wheel carries the same uv.exe as the GitHub archive.
+// uvWheelURL finds the current platform's wheel of the pinned uv release on a
+// PEP 503 index. The wheel carries the same uv executable as the GitHub archive.
 func uvWheelURL(ctx context.Context, index string) (string, error) {
 	page := index + "/uv/"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, page, nil)
@@ -230,12 +222,11 @@ func uvWheelURL(ctx context.Context, index string) (string, error) {
 		}
 		return "", errors.New("无法解析 uv 版本列表")
 	}
-	// Match a prefix and a suffix instead of the full wheel name: uv may change
-	// its tags, and the digest still pins the content.
-	prefix, suffix := "uv-"+uvVersion+"-", "-win_amd64.whl"
+	// 平台匹配规则见 uv_<platform>.go：Windows 接受 win_amd64 wheel，
+	// Linux 只接受固定版本的 manylinux wheel（排除 musllinux 等变体）。
 	address := ""
 	for _, file := range files {
-		if file.Yanked || file.URL == "" || !strings.HasPrefix(file.Filename, prefix) || !strings.HasSuffix(file.Filename, suffix) {
+		if file.Yanked || file.URL == "" || !matchUVWheel(file.Filename) {
 			continue
 		}
 		// Some mirrors list the same file twice; only distinct addresses are
@@ -256,7 +247,7 @@ func uvWheelURL(ctx context.Context, index string) (string, error) {
 
 func (m *Manager) Install(version string, official, start bool) error {
 	if !supported() {
-		return errors.New("首版仅支持 Windows x64")
+		return errors.New("当前系统暂不支持安装 NeoBot")
 	}
 	if !versionPattern.MatchString(version) {
 		return errors.New("请选择 NeoBot 发行版本")
@@ -350,7 +341,7 @@ func (m *Manager) install(ctx context.Context, version string, sources Sources) 
 
 	m.setStep("neobot", "正在安装 NeoBot "+version, 2)
 	dir := m.versionDir(version)
-	python := filepath.Join(dir, "Scripts", "python.exe")
+	python := venvPython(dir)
 	if !isFile(python) {
 		if err := runUV(ctx, uv, env, "venv", "--allow-existing", "--python", "3.13", "--no-python-downloads", dir); err != nil {
 			return fmt.Errorf("创建 NeoBot 环境失败：%w", err)
@@ -381,7 +372,7 @@ func (m *Manager) installEnv() []string {
 }
 
 func (m *Manager) ensureUV(ctx context.Context, sources Sources) (string, error) {
-	uv := filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe")
+	uv := uvExecutable(m.root)
 	// A killed install can leave a partial download behind, even when the
 	// executable itself was already renamed into place.
 	if entries, err := os.ReadDir(filepath.Join(m.root, "tools")); err == nil {
@@ -403,7 +394,7 @@ func (m *Manager) ensureUV(ctx context.Context, sources Sources) (string, error)
 		}
 		return uv, installUV(ctx, uv, address, uvWheelSHA256, uvWheelEntry)
 	}
-	address := sources.UV + "/" + uvVersion + "/" + uvArchive
+	address := sources.UV + "/" + uvVersion + "/" + uvArchiveFile
 	return uv, installUV(ctx, uv, address, uvArchiveSHA256, uvArchiveEntry)
 }
 
@@ -469,7 +460,7 @@ func installUV(ctx context.Context, target, address, expectedSHA256, entry strin
 		return err
 	}
 	defer resp.Body.Close()
-	tmp, err := os.CreateTemp(filepath.Dir(target), ".uv-*.zip")
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".uv-*")
 	if err != nil {
 		return errors.New("无法创建 uv 临时文件，请检查磁盘空间")
 	}
@@ -492,7 +483,31 @@ func installUV(ctx context.Context, target, address, expectedSHA256, entry strin
 	return extractUV(tmp.Name(), target, entry)
 }
 
+// uvMaxBytes 是单个 uv 可执行文件的大小上限。
+const uvMaxBytes = 96 << 20
+
+// extractUV 从 uv 发行包里取出指定的可执行文件。官方源是 .tar.gz，加速源是
+// wheel（zip）；这里按文件头魔数判断格式，不依赖下载地址的后缀。
 func extractUV(archive, target, entry string) error {
+	file, err := os.Open(archive)
+	if err != nil {
+		return errors.New("uv 压缩包无效")
+	}
+	defer file.Close()
+	var magic [2]byte
+	if _, err := io.ReadFull(file, magic[:]); err != nil {
+		return errors.New("uv 压缩包无效")
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return errors.New("uv 压缩包无效")
+	}
+	if magic[0] == 0x1f && magic[1] == 0x8b {
+		return extractUVTarGz(file, target, entry)
+	}
+	return extractUVZip(archive, target, entry)
+}
+
+func extractUVZip(archive, target, entry string) error {
 	r, err := zip.OpenReader(archive)
 	if err != nil {
 		return errors.New("uv 压缩包无效")
@@ -504,7 +519,7 @@ func extractUV(archive, target, entry string) error {
 		if file.Name != entry || !file.Mode().IsRegular() {
 			continue
 		}
-		if file.UncompressedSize64 > 96<<20 {
+		if file.UncompressedSize64 > uvMaxBytes {
 			return errors.New("uv 文件过大")
 		}
 		in, err := file.Open()
@@ -512,22 +527,59 @@ func extractUV(archive, target, entry string) error {
 			return errors.New("无法读取 uv 压缩包")
 		}
 		defer in.Close()
-		out, err := os.CreateTemp(filepath.Dir(target), ".uv-*.exe")
-		if err != nil {
-			return errors.New("无法创建 uv 临时文件，请检查磁盘空间")
-		}
-		defer os.Remove(out.Name())
-		_, err = io.Copy(out, in)
-		if closeErr := out.Close(); err == nil {
-			err = closeErr
-		}
-		if err != nil {
-			return errors.New("无法写入 uv 文件，请检查磁盘空间")
-		}
-		if err := os.Rename(out.Name(), target); err != nil {
-			return errors.New("无法保存 uv 可执行文件")
-		}
-		return nil
+		return writeUVFile(in, target)
 	}
-	return errors.New("压缩包缺少 uv.exe")
+	return errors.New("压缩包缺少 uv 可执行文件")
+}
+
+func extractUVTarGz(reader io.Reader, target, entry string) error {
+	gz, err := gzip.NewReader(reader)
+	if err != nil {
+		return errors.New("uv 压缩包无效")
+	}
+	defer gz.Close()
+	tarReader := tar.NewReader(gz)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return errors.New("uv 压缩包无效")
+		}
+		if header.Name != entry {
+			continue
+		}
+		if header.Typeflag != tar.TypeReg {
+			return errors.New("uv 压缩包里的 uv 不是普通文件")
+		}
+		if header.Size > uvMaxBytes {
+			return errors.New("uv 文件过大")
+		}
+		return writeUVFile(tarReader, target)
+	}
+	return errors.New("压缩包缺少 uv 可执行文件")
+}
+
+// writeUVFile 把唯一一个可执行文件写到目标位置，并补上可执行位。
+func writeUVFile(source io.Reader, target string) error {
+	out, err := os.CreateTemp(filepath.Dir(target), ".uv-*")
+	if err != nil {
+		return errors.New("无法创建 uv 临时文件，请检查磁盘空间")
+	}
+	defer os.Remove(out.Name())
+	written, err := io.Copy(out, io.LimitReader(source, uvMaxBytes+1))
+	if closeErr := out.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return errors.New("无法写入 uv 文件，请检查磁盘空间")
+	}
+	if written > uvMaxBytes {
+		return errors.New("uv 文件过大")
+	}
+	if err := os.Rename(out.Name(), target); err != nil {
+		return errors.New("无法保存 uv 可执行文件")
+	}
+	return makeExecutable(target)
 }

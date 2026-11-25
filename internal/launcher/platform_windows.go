@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -56,7 +58,9 @@ func lockInstance(path string) (func(), error) {
 	return func() { _ = windows.CloseHandle(h) }, nil
 }
 
-func suspendAtLaunch(cmd *exec.Cmd) { cmd.SysProcAttr.CreationFlags |= windows.CREATE_SUSPENDED }
+// prepareLaunch 让 NeoBot 以挂起状态启动，等它被放进 Job Object 后再恢复。
+// 这样从第一个指令开始，进程及其后续子进程都受启动器控制。
+func prepareLaunch(cmd *exec.Cmd) { cmd.SysProcAttr.CreationFlags |= windows.CREATE_SUSPENDED }
 
 func trackProcessTree(pid int) (func(), func(int) bool, error) {
 	job, err := windows.CreateJobObject(nil, nil)
@@ -109,6 +113,21 @@ func trackProcessTree(pid int) (func(), func(int) bool, error) {
 	}
 	return closeJob, ownsPID, nil
 }
+
+// makeExecutable 在 Windows 上不需要：可执行性由 .exe 扩展名决定。
+func makeExecutable(string) error { return nil }
+
+// appDataBase 返回启动器数据根目录的上级目录。Windows 沿用 %LocalAppData%。
+func appDataBase() (string, error) { return os.UserCacheDir() }
+
+// openPath 用资源管理器打开目录。
+func OpenPath(path string) error { return exec.Command("explorer", path).Start() }
+
+// samePath 在 Windows 上忽略大小写和分隔符差异。
+func samePath(a, b string) bool { return strings.EqualFold(filepath.Clean(a), filepath.Clean(b)) }
+
+// terminalSupported 报告当前平台是否实现了高级终端。
+func terminalSupported() bool { return true }
 
 func resumeProcess(pid int) error {
 	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPTHREAD, 0)

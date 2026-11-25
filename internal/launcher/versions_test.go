@@ -19,11 +19,11 @@ func versionsTestManager(t *testing.T) *Manager {
 // versionsWriteInstall 写一份最小可用的安装目录，scanInstalled/validInstallDir 都认。
 func versionsWriteInstall(t *testing.T, dir, version string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Join(dir, "Scripts"), 0700); err != nil {
+	if err := os.MkdirAll(venvBin(dir), 0700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"python.exe", "neobot.exe"} {
-		if err := os.WriteFile(filepath.Join(dir, "Scripts", name), []byte("stub"), 0600); err != nil {
+	for _, path := range []string{venvPython(dir), botExecutable(dir)} {
+		if err := os.WriteFile(path, []byte("stub"), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -377,7 +377,7 @@ func TestRepairReportsWhichStepFailed(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(m.root, "tools"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	uv := filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe")
+	uv := uvExecutable(m.root)
 	if err := os.WriteFile(uv, []byte("not an executable"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func TestRepairReportsWhichStepFailed(t *testing.T) {
 	}
 
 	// python.exe 丢了：先重建环境，错误应指向环境重建。
-	if err := os.Remove(filepath.Join(dir, "Scripts", "python.exe")); err != nil {
+	if err := os.Remove(venvPython(filepath.Join(dir))); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Repair("1.0.0"); err != nil {

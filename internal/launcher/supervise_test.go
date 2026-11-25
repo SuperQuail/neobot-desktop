@@ -116,7 +116,7 @@ func TestSetAutostartWritesRegistryAndRollsBack(t *testing.T) {
 	if err == nil {
 		t.Fatal("写注册表失败时应该返回错误")
 	}
-	if !strings.Contains(err.Error(), "安全软件") {
+	if hint := autostartErrorHint(); hint != "" && !strings.Contains(err.Error(), hint) {
 		t.Fatalf("错误提示要说清下一步：%q", err)
 	}
 	if !m.Snapshot().Supervisor.Autostart {

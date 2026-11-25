@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react'
 import {Button, Card, Typography} from 'antd'
 import {CheckUpdate, DownloadUpdate, LaunchUpdate, Quit} from '../../wailsjs/go/main/App'
+import {BrowserOpenURL} from '../../wailsjs/runtime/runtime'
 import {useLauncher} from '../app/LauncherProvider'
 import {APP_VERSION} from '../app/version'
 
@@ -37,7 +38,7 @@ export function UpdateCard() {
     if (!state) return null
     const update = state.update
     const downloaded = Boolean(update.downloaded)
-    const downloadable = Boolean(update.asset_url && update.checksums_url)
+    const downloadable = Boolean(update.auto_update && update.asset_url && update.checksums_url)
     const checkedAt = formatCheckedAt(update.checked_at)
     const idle = busy === ''
 
@@ -51,7 +52,8 @@ export function UpdateCard() {
                     : update.error ? update.error
                         : (checkedAt ? `已是最新版本 · 上次检查 ${checkedAt}` : '尚未检查更新')
     const hint = busy === 'download' ? '正在下载并校验安装包。'
-        : update.available && !downloaded && !downloadable ? '此版本缺少安装包或校验文件，请查看最新发布页。'
+        : update.available && !update.auto_update ? '当前系统请到发布页下载更新包。'
+            : update.available && !downloaded && !downloadable ? '此版本缺少安装包或校验文件，请查看最新发布页。'
             : update.available && !downloaded ? (update.notes || '下载完成后，点击「退出并安装」开始更新。')
                 : update.error && checkedAt ? `上次检查 ${checkedAt}；网络或接口恢复后可以再试。`
                     : ''
@@ -113,15 +115,22 @@ export function UpdateCard() {
                 {downloaded
                     ? <Button size="small" type="primary" loading={busy === 'install'}
                         disabled={!idle} onClick={() => void install()}>退出并安装</Button>
-                    : update.available && downloadable
+                    : update.available && !update.auto_update
                         ? <>
                             <Button size="small" type="text" loading={update.checking} disabled={!idle || busy !== ''}
                                 onClick={() => void check()}>重新检查</Button>
-                            <Button size="small" type="primary" loading={busy === 'download'}
-                                disabled={!idle || update.checking} onClick={() => void download()}>下载更新</Button>
+                            <Button size="small" type="primary" disabled={!update.page_url}
+                                onClick={() => update.page_url && BrowserOpenURL(update.page_url)}>打开发布页</Button>
                         </>
-                        : <Button size="small" type="text" loading={update.checking}
-                            disabled={!idle} onClick={() => void check()}>检查更新</Button>}
+                        : update.available && downloadable
+                            ? <>
+                                <Button size="small" type="text" loading={update.checking} disabled={!idle || busy !== ''}
+                                    onClick={() => void check()}>重新检查</Button>
+                                <Button size="small" type="primary" loading={busy === 'download'}
+                                    disabled={!idle || update.checking} onClick={() => void download()}>下载更新</Button>
+                            </>
+                            : <Button size="small" type="text" loading={update.checking}
+                                disabled={!idle} onClick={() => void check()}>检查更新</Button>}
             </div>
         </div>
 

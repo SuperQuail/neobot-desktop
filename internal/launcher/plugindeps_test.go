@@ -74,7 +74,7 @@ func TestSyncPluginDependenciesSkipsWithoutInstall(t *testing.T) {
 		t.Fatalf("unexpected log lines: %q", lines)
 	}
 	// 有解释器但没有插件目录：同样什么都不做。
-	python := filepath.Join(m.versionDir("1.0.0"), "Scripts", "python.exe")
+	python := venvPython(m.versionDir("1.0.0"))
 	if err := os.MkdirAll(filepath.Dir(python), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestSyncPluginDependenciesReportsProbeFailure(t *testing.T) {
 	root := t.TempDir()
 	m := &Manager{root: root, state: diskState{Backups: map[string]string{}}}
 	data := filepath.Join(root, "data")
-	python := filepath.Join(m.versionDir("1.0.0"), "Scripts", "python.exe")
+	python := venvPython(m.versionDir("1.0.0"))
 	if err := os.MkdirAll(filepath.Dir(python), 0700); err != nil {
 		t.Fatal(err)
 	}

@@ -88,7 +88,7 @@ func (m *Manager) checkBranchInstall(start bool) error {
 
 func (m *Manager) InstallBranch(repository, branch string, start, refresh bool) error {
 	if !supported() {
-		return errors.New("首版仅支持 Windows x64")
+		return errors.New("当前系统暂不支持安装 NeoBot")
 	}
 	repository, err := normalizeGitHubRepo(repository)
 	if err != nil {
@@ -165,7 +165,7 @@ func (m *Manager) InstallBranch(repository, branch string, start, refresh bool) 
 			record, recordErr := readInstallRecord(m.versionDir(id))
 			version, valid := record.branchVersion(id)
 			if recordErr != nil || !valid || version.Repository != repository || version.Branch != branch ||
-				!isFile(m.binary(id)) || !isFile(filepath.Join(m.versionDir(id), "Scripts", "python.exe")) {
+				!isFile(m.binary(id)) || !isFile(venvPython(m.versionDir(id))) {
 				delete(m.installed, id)
 				if m.state.Selected == id {
 					m.state.Selected = ""
@@ -250,7 +250,7 @@ func (m *Manager) installBranch(ctx context.Context, repository, branch, id stri
 	if err = runBranchSync(ctx, uv, env, source, target); err != nil {
 		return err
 	}
-	python := filepath.Join(target, "Scripts", "python.exe")
+	python := venvPython(target)
 	if !isFile(python) {
 		return errors.New("安装完成后没有找到分支版本的 Python")
 	}
@@ -394,7 +394,7 @@ func extractBranchSource(ctx context.Context, archive, destination string) (stri
 		if err != nil {
 			return "", err
 		}
-		output, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		output, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, copyFileMode(file.Mode()))
 		if err != nil {
 			input.Close()
 			return "", errors.New("解压分支源码失败")

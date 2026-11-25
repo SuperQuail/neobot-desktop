@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -33,6 +32,8 @@ type UpdateStatus struct {
 	Downloaded   string `json:"downloaded"`
 	Error        string `json:"error"`
 	Recommended  string `json:"recommended"`
+	// AutoUpdate 表示当前平台支持应用内下载并安装更新。Linux 第一版只做手动下载。
+	AutoUpdate bool `json:"auto_update"`
 	// NoReleases 表示仓库还没有发布任何版本：这不是错误，只是暂时没得更新。
 	NoReleases bool `json:"no_releases"`
 }
@@ -48,10 +49,6 @@ var (
 const (
 	// updateUserAgent 是自更新请求的 User-Agent；GitHub 拒绝没有 UA 的请求。
 	updateUserAgent = "neobot-desktop"
-	// updateAssetName 是安装包的正式资产名；找不到时按后缀兜底，避免平台名变化后彻底失效。
-	updateAssetName    = "neobot-desktop-amd64-installer.exe"
-	updateAssetSuffix  = "-installer.exe"
-	updateChecksumName = "checksums.txt"
 	// updateCheckInterval 是自动检查的最小间隔；用户点「检查更新」时传 force，不受限制。
 	updateCheckInterval = time.Hour
 	// recommendedTTL 是推荐版本的缓存时长；过期后回落编译期常量，直到下一次检查成功。
@@ -223,7 +220,7 @@ func recommendedFor(version, minLauncher, current string) string {
 // checkLatestUpdate 组装一次完整的检查结果：最新发布与推荐版本。
 // 发布接口失败时返回错误，但仍会带上推荐版本（两者互不影响）。
 func checkLatestUpdate(ctx context.Context, current string) (UpdateStatus, error) {
-	status := UpdateStatus{Current: current, Recommended: fetchRecommendedVersion(ctx, current)}
+	status := UpdateStatus{Current: current, AutoUpdate: updateAutoInstall, Recommended: fetchRecommendedVersion(ctx, current)}
 	release, err := fetchUpdateRelease(ctx)
 	if err != nil {
 		return status, err
@@ -247,11 +244,11 @@ func checkLatestUpdate(ctx context.Context, current string) (UpdateStatus, error
 	for _, asset := range release.Assets {
 		name := strings.ToLower(strings.TrimSpace(asset.Name))
 		switch {
-		case name == updateAssetName:
+		case updateAssetName != "" && name == updateAssetName:
 			status.AssetURL = asset.URL // 正式资产名优先，出现多个安装包时不会被兜底规则抢走
-		case name == updateChecksumName:
+		case updateChecksumName != "" && name == updateChecksumName:
 			status.ChecksumsURL = asset.URL
-		case strings.HasSuffix(name, updateAssetSuffix) && status.AssetURL == "":
+		case updateAssetSuffix != "" && strings.HasSuffix(name, updateAssetSuffix) && status.AssetURL == "":
 			status.AssetURL = asset.URL
 		}
 	}
@@ -351,6 +348,7 @@ func (m *Manager) runUpdateCheck(current string) {
 		m.update.PageURL = status.PageURL
 		m.update.AssetURL = status.AssetURL
 		m.update.ChecksumsURL = status.ChecksumsURL
+		m.update.AutoUpdate = status.AutoUpdate
 		m.update.Downloaded = kept
 		m.update.Error = ""
 	}
@@ -508,23 +506,15 @@ func updateAssetFileName(address string) (string, error) {
 	if index := strings.LastIndexAny(name, `/\`); index >= 0 {
 		name = name[index+1:]
 	}
-	if !strings.HasSuffix(strings.ToLower(name), updateAssetSuffix) || strings.ContainsAny(name, `/:*?"<>|`) {
+	if updateAssetSuffix == "" || !strings.HasSuffix(strings.ToLower(name), updateAssetSuffix) || strings.ContainsAny(name, `/:*?"<>|`) {
 		return "", errors.New("安装包地址无效，请重新检查更新")
 	}
 	return filepath.Base(name), nil
 }
 
-// updateLauncher 启动下载好的 NSIS 安装包（/S 静默）。抽成变量便于测试替换。
-//
-// 不直接 exec：安装器要覆盖本进程正在运行的 neobot-desktop.exe，立刻启动多半会
-// 因为文件被占用而装不上。这里让 cmd 等 3 秒再启动安装程序，前端在 LaunchUpdate
-// 返回后立刻 Quit，等安装器真正开始复制时启动器已经退出。
-var updateLauncher = func(path string) error {
-	cmd := exec.Command("cmd", "/c", "timeout /t 3 /nobreak >nul & start \"\" \""+path+"\" /S")
-	cmd.Dir = filepath.Dir(path)
-	hideWindow(cmd)
-	return cmd.Start()
-}
+// updateLauncher 启动下载好的安装包；具体实现按平台放在 update_<platform>.go。
+// 抽成变量便于测试替换。
+var updateLauncher = launchUpdateInstaller
 
 // LaunchUpdate 启动已下载的安装包。静默安装前必须先停止 NeoBot。
 func (m *Manager) LaunchUpdate() error {

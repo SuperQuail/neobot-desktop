@@ -61,8 +61,6 @@ func seedDashboardConfig(data string) error {
 	return errors.Join(err, f.Close())
 }
 
-func samePath(a, b string) bool { return strings.EqualFold(filepath.Clean(a), filepath.Clean(b)) }
-
 func (m *Manager) Start(confirmed bool) error {
 	m.mu.Lock()
 	if m.bot != nil || m.stopping || m.closing || m.job.State == "running" || m.preparing {
@@ -75,7 +73,7 @@ func (m *Manager) Start(confirmed bool) error {
 		m.mu.Unlock()
 		return errors.New("请先安装并选择 NeoBot 版本")
 	}
-	if !isFile(m.binary(version)) || !isFile(filepath.Join(m.versionDir(version), "Scripts", "python.exe")) {
+	if !isFile(m.binary(version)) || !isFile(venvPython(m.versionDir(version))) {
 		m.mu.Unlock()
 		return errors.New("当前版本安装不完整，请重新安装")
 	}
@@ -115,12 +113,12 @@ func (m *Manager) start(version string, confirmed bool) {
 	if m.closing {
 		return
 	}
-	python := filepath.Join(m.versionDir(version), "Scripts", "python.exe")
+	python := venvPython(m.versionDir(version))
 	cmd := exec.Command(python, "-u", "-m", "neobot_app.cli")
 	cmd.Dir = data
 	cmd.Env = m.backendEnv(data, sources)
 	hideWindow(cmd)
-	suspendAtLaunch(cmd)
+	prepareLaunch(cmd)
 	reader, writer, err := os.Pipe()
 	if err != nil {
 		m.runtimeError = "无法读取本机启动状态"
@@ -376,7 +374,7 @@ func (m *Manager) setRuntimeError(reason string) {
 }
 
 func AppData() (string, error) {
-	base, err := os.UserCacheDir()
+	base, err := appDataBase()
 	if err != nil {
 		return "", err
 	}

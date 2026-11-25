@@ -33,16 +33,16 @@ func TestCheckInstalledFilesReportsMissingBinaries(t *testing.T) {
 		"1.1.0": {Name: "1.1.0"},
 	}}
 	for _, version := range []string{"1.0.0", "1.1.0"} {
-		healthTestWrite(t, filepath.Join(root, "versions", version, "Scripts", "python.exe"), "")
+		healthTestWrite(t, venvPython(filepath.Join(root, "versions", version)), "")
 	}
-	healthTestWrite(t, filepath.Join(root, "versions", "1.0.0", "Scripts", "neobot.exe"), "")
+	healthTestWrite(t, botExecutable(filepath.Join(root, "versions", "1.0.0")), "")
 
 	state, detail, hint := m.checkInstalledFiles(m.healthTarget())
-	if state != "fail" || !strings.Contains(detail, "1.1.0 的 neobot.exe") || hint == "" {
+	if state != "fail" || !strings.Contains(detail, "1.1.0 的 "+filepath.Base(botExecutable(""))) || hint == "" {
 		t.Fatalf("state = %q，detail = %q，hint = %q", state, detail, hint)
 	}
 
-	healthTestWrite(t, filepath.Join(root, "versions", "1.1.0", "Scripts", "neobot.exe"), "")
+	healthTestWrite(t, botExecutable(filepath.Join(root, "versions", "1.1.0")), "")
 	if state, _, _ = m.checkInstalledFiles(m.healthTarget()); state != "ok" {
 		t.Fatalf("补齐后 state = %q", state)
 	}
@@ -132,7 +132,7 @@ func TestHealthCommandsSkipWithoutSelectedVersion(t *testing.T) {
 	// 有 python.exe 但没有 uv：pip check 依然跳过，而 doctor 应该可以组装出来。
 	root := t.TempDir()
 	m = &Manager{root: root}
-	healthTestWrite(t, filepath.Join(root, "versions", "1.0.0", "Scripts", "python.exe"), "")
+	healthTestWrite(t, venvPython(filepath.Join(root, "versions", "1.0.0")), "")
 	if command := m.pipCheckCommand(healthTarget{version: "1.0.0"}); command.Skipped == "" {
 		t.Fatal("没有 uv 时 pip check 应跳过")
 	}
@@ -199,7 +199,7 @@ func TestCheckPluginDependenciesSkipsWithoutVersionOrPlugins(t *testing.T) {
 	}
 
 	m.state.Selected = "1.0.0"
-	healthTestWrite(t, filepath.Join(m.root, "versions", "1.0.0", "Scripts", "python.exe"), "")
+	healthTestWrite(t, venvPython(filepath.Join(m.root, "versions", "1.0.0")), "")
 	state, detail, _ := m.checkPluginDependencies(m.healthTarget())
 	if state != "skip" || !strings.Contains(detail, "插件") {
 		t.Fatalf("没有插件时 state = %q，detail = %q", state, detail)
@@ -209,7 +209,7 @@ func TestCheckPluginDependenciesSkipsWithoutVersionOrPlugins(t *testing.T) {
 func TestCheckPluginDependenciesReportsProbeFailureReadOnly(t *testing.T) {
 	root := t.TempDir()
 	m := &Manager{root: root, state: diskState{Selected: "1.0.0"}}
-	healthTestWrite(t, filepath.Join(root, "versions", "1.0.0", "Scripts", "python.exe"), "")
+	healthTestWrite(t, venvPython(filepath.Join(root, "versions", "1.0.0")), "")
 	manifest := filepath.Join(root, "data", "plugins", "demo", "plugin.toml")
 	healthTestWrite(t, manifest, "name = \"demo\"\npython_dependencies = [\"feedparser>=6.0,<7\"]\n")
 
@@ -229,11 +229,11 @@ func TestCheckPluginDependenciesReportsProbeFailureReadOnly(t *testing.T) {
 func TestHealthCommandsUseRunningVersion(t *testing.T) {
 	root := t.TempDir()
 	m := &Manager{root: root, state: diskState{Selected: "1.0.0"}}
-	selectedPython := filepath.Join(root, "versions", "1.0.0", "Scripts", "python.exe")
-	runningPython := filepath.Join(root, "versions", "2.0.0", "Scripts", "python.exe")
+	selectedPython := venvPython(filepath.Join(root, "versions", "1.0.0"))
+	runningPython := venvPython(filepath.Join(root, "versions", "2.0.0"))
 	healthTestWrite(t, selectedPython, "")
 	healthTestWrite(t, runningPython, "")
-	healthTestWrite(t, filepath.Join(root, "tools", "uv-"+uvVersion+".exe"), "")
+	healthTestWrite(t, uvExecutable(root), "")
 	m.bot = &botProcess{version: "2.0.0"}
 
 	target := m.healthTarget()

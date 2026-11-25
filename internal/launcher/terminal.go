@@ -3,8 +3,8 @@ package launcher
 // 高级终端：从诊断页直接进入某个已安装版本的 venv。
 //
 // 这里只负责解析目标版本、拼出环境变量并交给平台实现。Windows 上用系统
-// cmd.exe 打开一个新控制台；其它平台的实现直接返回错误。终端拥有与当前
-// Windows 账户相同的权限，不是沙箱，因此首次使用必须由界面确认风险提示。
+// cmd.exe 打开一个新控制台；Linux 上打开系统终端模拟器。终端拥有与当前
+// 账户相同的权限，不是沙箱，因此首次使用必须由界面确认风险提示。
 
 import (
 	"errors"
@@ -60,6 +60,9 @@ func (m *Manager) terminalTargetLocked(requested string) (string, error) {
 // terminalInfoLocked 生成界面展示用的路径信息。调用方持有 m.mu。
 // 这里不检查文件是否存在，避免在快照里做磁盘 IO；打开终端时会再校验。
 func (m *Manager) terminalInfoLocked() TerminalInfo {
+	if !terminalSupported() {
+		return TerminalInfo{Reason: "当前系统暂不支持高级终端"}
+	}
 	target, err := m.terminalTargetLocked("")
 	if err != nil {
 		return TerminalInfo{Reason: err.Error()}
@@ -70,9 +73,9 @@ func (m *Manager) terminalInfoLocked() TerminalInfo {
 		Version:   target,
 		Label:     item.Label(),
 		Venv:      venv,
-		Python:    filepath.Join(venv, "Scripts", "python.exe"),
+		Python:    venvPython(venv),
 		Data:      m.dataDir(target),
-		UV:        filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe"),
+		UV:        uvExecutable(m.root),
 		Available: true,
 	}
 }
@@ -83,6 +86,9 @@ func (m *Manager) terminalInfoLocked() TerminalInfo {
 // 确认后传 true，后端把确认状态写进 settings.json。没有确认过又传 false 的
 // 调用会被拒绝，避免绕过首次提示。
 func (m *Manager) OpenTerminal(version string, acknowledged bool) error {
+	if !terminalSupported() {
+		return errors.New("当前系统暂不支持高级终端")
+	}
 	m.mu.Lock()
 	if m.root == "" {
 		m.mu.Unlock()
@@ -130,11 +136,11 @@ func (m *Manager) OpenTerminal(version string, acknowledged bool) error {
 	if err := os.MkdirAll(data, 0700); err != nil {
 		return errors.New("无法准备数据目录，请检查磁盘空间或权限后重试")
 	}
-	if !isFile(filepath.Join(venv, "Scripts", "python.exe")) {
+	if !isFile(venvPython(venv)) {
 		return errors.New("当前版本环境不完整，请先修复安装")
 	}
-	// uv 的可执行文件是按版本命名的；生成一个固定的 uv.cmd 转发脚本，
-	// 用户才能在终端里直接敲 uv，而不用记 uv-0.12.9.exe。
+	// uv 的可执行文件是按版本命名的；生成一个固定的 uv 转发命令
+	// （Windows 为 uv.cmd，Linux 为 uv 脚本），用户才能在终端里直接敲 uv。
 	if err := m.writeUVShim(); err != nil {
 		m.logMessage("无法创建 uv 命令：" + err.Error())
 	}
@@ -145,19 +151,27 @@ func (m *Manager) OpenTerminal(version string, acknowledged bool) error {
 	return nil
 }
 
-// writeUVShim 在 tools/ 下维护 uv.cmd，把 uv 转发到当前固定版本的 uv.exe。
-// 版本升级后内容会不匹配，下次打开终端时自动改写。
+// writeUVShim 在 tools/ 下维护 uv 命令，把 uv 转发到当前固定版本的可执行文件。
+// Windows 生成 uv.cmd，Linux 生成可执行的 uv 包装脚本；版本升级后内容会不匹配，
+// 下次打开终端时自动改写。
 func (m *Manager) writeUVShim() error {
-	exe := filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe")
+	exe := uvExecutable(m.root)
 	if !isFile(exe) {
 		return errors.New("缺少 uv，请重新安装或修复该版本")
 	}
-	shim := filepath.Join(m.root, "tools", "uv.cmd")
-	content := "@echo off\r\n\"%~dp0uv-" + uvVersion + ".exe\" %*\r\n"
-	if existing, err := os.ReadFile(shim); err == nil && string(existing) == content {
+	name, content, mode, err := uvShim(exe)
+	if err != nil {
+		return err
+	}
+	shim := filepath.Join(m.root, "tools", name)
+	if existing, err := os.ReadFile(shim); err == nil && string(existing) == string(content) {
+		_ = os.Chmod(shim, mode)
 		return nil
 	}
-	return os.WriteFile(shim, []byte(content), 0600)
+	if err := os.WriteFile(shim, content, mode); err != nil {
+		return err
+	}
+	return os.Chmod(shim, mode)
 }
 
 // terminalEnv 构造终端进程的环境。它沿用启动器安装时使用的缓存、Python
@@ -168,7 +182,7 @@ func (m *Manager) writeUVShim() error {
 func terminalEnv(root, data, venv string, sources Sources) []string {
 	env := cleanEnv(true)
 	pathParts := []string{
-		filepath.Join(venv, "Scripts"),
+		venvBin(venv),
 		venv,
 		filepath.Join(root, "tools"),
 	}
@@ -181,8 +195,8 @@ func terminalEnv(root, data, venv string, sources Sources) []string {
 	for _, kv := range env {
 		name := strings.ToUpper(strings.SplitN(kv, "=", 2)[0])
 		switch {
-		case name == "PATH", name == "PROMPT", name == "PIP_INDEX_URL", name == "PIP_EXTRA_INDEX_URL",
-			name == "PIP_CONFIG_FILE", strings.HasPrefix(name, "NEOBOT_"):
+		case name == "PATH", name == "PROMPT", name == "PS1", name == "PIP_INDEX_URL",
+			name == "PIP_EXTRA_INDEX_URL", name == "PIP_CONFIG_FILE", strings.HasPrefix(name, "NEOBOT_"):
 			// 这些值要么由下面统一重建，要么会把终端带到别的安装/索引上。
 			continue
 		}
@@ -198,11 +212,9 @@ func terminalEnv(root, data, venv string, sources Sources) []string {
 		"UV_CACHE_DIR="+filepath.Join(root, "cache"),
 		"UV_PYTHON_INSTALL_DIR="+filepath.Join(root, "python"),
 		"UV_PYTHON_PREFERENCE=only-managed",
-		// 数据目录里可能放着 .env、插件文件或用户脚本；不让 cmd 先搜索
-		// 当前目录，避免同名程序遮蔽 venv/tools 里的 python 和 uv。
-		"NoDefaultCurrentDirectoryInExePath=1",
-		"PROMPT=[NeoBot "+filepath.Base(venv)+"] $P$G",
 	)
+	// 平台相关的 shell 提示符与环境变量由 terminal_<platform>.go 提供。
+	result = append(result, terminalShellEnv(filepath.Base(venv))...)
 	if sources.Index != "" {
 		result = append(result, "UV_DEFAULT_INDEX="+sources.Index, "PIP_INDEX_URL="+sources.Index)
 	}

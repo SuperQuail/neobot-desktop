@@ -37,3 +37,19 @@ func comspec() string {
 	}
 	return "cmd.exe"
 }
+
+// terminalShellEnv 返回 Windows 控制台需要的提示符与搜索行为。
+func terminalShellEnv(version string) []string {
+	return []string{
+		// 数据目录里可能放着 .env、插件文件或用户脚本；不让 cmd 先搜索
+		// 当前目录，避免同名程序遮蔽 venv/tools 里的 python 和 uv。
+		"NoDefaultCurrentDirectoryInExePath=1",
+		"PROMPT=[NeoBot " + version + "] $P$G",
+	}
+}
+
+// uvShim 生成 Windows 的 uv.cmd 转发脚本。
+func uvShim(exe string) (string, []byte, os.FileMode, error) {
+	content := "@echo off\r\n\"%~dp0" + filepath.Base(exe) + "\" %*\r\n"
+	return "uv.cmd", []byte(content), 0600, nil
+}

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -495,9 +494,5 @@ func (a *App) OpenFolder(kind string) error {
 	if err != nil {
 		return err
 	}
-	return openInExplorer(dir)
-}
-
-func openInExplorer(dir string) error {
-	return exec.Command("explorer", dir).Start()
+	return launcher.OpenPath(dir)
 }

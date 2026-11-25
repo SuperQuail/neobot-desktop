@@ -186,7 +186,7 @@ func (m *Manager) diagnosticsEntries(snapshot Snapshot, target healthTarget) []z
 	entries = append(entries, m.diagnosticsHostLog())
 	entries = append(entries,
 		diagnosticsCommandEntry("doctor.txt", "python -m neobot_app.cli doctor", m.doctorCommand(target)),
-		diagnosticsCommandEntry("pip-check.txt", "uv pip check --python <当前版本>/Scripts/python.exe", m.pipCheckCommand(target)),
+		diagnosticsCommandEntry("pip-check.txt", "uv pip check --python <当前版本>/"+filepath.ToSlash(filepath.Join(venvBinDir, "python"+exeSuffix)), m.pipCheckCommand(target)),
 		zipEntry{name: "plugins.json", data: diagnosticsJSON(m.diagnosticsPlugins(snapshot))},
 	)
 	return entries

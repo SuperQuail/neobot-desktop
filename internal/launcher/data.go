@@ -152,6 +152,16 @@ func (m *Manager) recoverData() error {
 	return os.Remove(m.journalPath())
 }
 
+// copyFileMode 返回写入副本时使用的权限：保留所有者的读写位和源文件的可执行位，
+// 但不把数据目录里的私密文件复制成组/其他可读。
+func copyFileMode(source os.FileMode) os.FileMode {
+	mode := os.FileMode(0600)
+	if source.Perm()&0111 != 0 {
+		mode |= 0111
+	}
+	return mode
+}
+
 func copyData(source, target string) error {
 	info, err := os.Lstat(source)
 	if err != nil {
@@ -181,12 +191,16 @@ func copyData(source, target string) error {
 		if info.IsDir() {
 			return os.Mkdir(dest, 0700)
 		}
+		entryInfo, err := info.Info()
+		if err != nil {
+			return err
+		}
 		in, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer in.Close()
-		out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, copyFileMode(entryInfo.Mode()))
 		if err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-:root { font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; color: #15213a; background: #f3f6fc; --title-height: 54px; --launch-blue: #075ecb; --launch-border: #abccee; }
+:root { font-family: "Segoe UI", "Microsoft YaHei UI", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif; color: #15213a; background: #f3f6fc; --title-height: 54px; --launch-blue: #075ecb; --launch-border: #abccee; }
 body { margin: 0; }
 .shell { height: 100dvh; overflow: hidden; background: #f3f6fc; }
 .title-bar {

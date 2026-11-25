@@ -112,7 +112,7 @@ func (m *Manager) syncPluginDependencies(version, data string, sources Sources) 
 			m.logMessage("检查插件依赖时出错，已跳过")
 		}
 	}()
-	python := filepath.Join(m.versionDir(version), "Scripts", "python.exe")
+	python := venvPython(m.versionDir(version))
 	pluginDir := filepath.Join(data, "plugins")
 	if !isFile(python) || !hasPluginManifests(pluginDir) {
 		return
@@ -126,7 +126,7 @@ func (m *Manager) syncPluginDependencies(version, data string, sources Sources) 
 	if len(requirements) == 0 {
 		return
 	}
-	uv := filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe")
+	uv := uvExecutable(m.root)
 	if !isFile(uv) {
 		m.logMessage("缺少 uv，无法自动安装插件依赖；" + strings.Join(names, "、") + " 可能无法加载")
 		return

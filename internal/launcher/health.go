@@ -86,7 +86,7 @@ func (m *Manager) healthTarget() healthTarget {
 }
 
 // RefreshHealth 异步体检，结果写入 Snapshot.Health 并触发 launcher:changed。
-// 必须覆盖：已安装版本完整性（python.exe/neobot.exe）、uv pip check、
+// 必须覆盖：已安装版本完整性（Python 解释器/NeoBot 启动程序）、uv pip check、
 // 已启用插件的依赖、上游 python -m neobot_app.cli doctor（退出码 1 表示有依赖问题）、
 // 本机控制接口可达性、数据目录可写、磁盘剩余空间。
 // 体检不启动 NeoBot，也不得修改任何文件。
@@ -161,18 +161,20 @@ func (m *Manager) runHealthCheck(check healthCheck, target healthTarget) (item H
 	return HealthItem{Key: check.key, Title: check.title, State: state, Detail: detail, Hint: hint}
 }
 
-// checkInstalledFiles 检查每个已安装版本的 python.exe 与 neobot.exe 是否还在。
+// checkInstalledFiles 检查每个已安装版本的 Python 解释器与 NeoBot 启动程序是否还在。
 func (m *Manager) checkInstalledFiles(target healthTarget) (string, string, string) {
 	if len(target.versions) == 0 {
 		return "skip", "还没有安装 NeoBot 版本。", "在「版本管理」里安装一个版本后再体检。"
 	}
+	pythonName := filepath.Base(venvPython(""))
+	botName := filepath.Base(botExecutable(""))
 	missing := make([]string, 0, 2)
 	for _, version := range target.versions {
-		if !isFile(filepath.Join(m.versionDir(version.Name), "Scripts", "python.exe")) {
-			missing = append(missing, version.Name+" 的 python.exe")
+		if !isFile(venvPython(m.versionDir(version.Name))) {
+			missing = append(missing, version.Name+" 的 "+pythonName)
 		}
 		if !isFile(m.binary(version.Name)) {
-			missing = append(missing, version.Name+" 的 neobot.exe")
+			missing = append(missing, version.Name+" 的 "+botName)
 		}
 	}
 	if len(missing) == 0 {
@@ -325,9 +327,9 @@ func (m *Manager) checkDataDir(target healthTarget) (string, string, string) {
 
 // checkDisk 确认安装目录所在的磁盘可以访问。
 //
-// 标准库没有跨平台的「剩余空间」接口：Windows 要用 GetDiskFreeSpaceEx，其它平台要用
-// Statfs，而平台相关代码只允许放在 platform_*.go（不在本次改动范围）。所以这里只验证
-// 磁盘可访问、并给出启动器自身占用的空间；精确数值写在诊断包的 system.txt 里。
+// 标准库没有跨平台的「剩余空间」接口：Windows 用 GetDiskFreeSpaceEx，Linux 用
+// Statfs，两者都在 platform_*.go 里。这里只负责组织提示文案；读取失败时降级为
+// 只验证磁盘可访问，并给出启动器自身占用的空间。
 func (m *Manager) checkDisk(target healthTarget) (string, string, string) {
 	mount := m.root
 	if volume := filepath.VolumeName(m.root); volume != "" {
@@ -358,7 +360,7 @@ func (m *Manager) pipCheckCommand(target healthTarget) stagedCommand {
 	if skipped != "" {
 		return stagedCommand{Skipped: skipped}
 	}
-	uv := filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe")
+	uv := uvExecutable(m.root)
 	if !isFile(uv) {
 		return stagedCommand{Skipped: "找不到 uv，无法检查依赖。"}
 	}
@@ -390,9 +392,9 @@ func (m *Manager) healthPython(target healthTarget) (string, string) {
 	if target.version == "" {
 		return "", "还没有选择要运行的版本。"
 	}
-	python := filepath.Join(m.versionDir(target.version), "Scripts", "python.exe")
+	python := venvPython(m.versionDir(target.version))
 	if !isFile(python) {
-		return "", "当前版本缺少 python.exe，无法在这个版本上运行检查。"
+		return "", "当前版本缺少 " + filepath.Base(python) + "，无法在这个版本上运行检查。"
 	}
 	return python, ""
 }

@@ -228,9 +228,9 @@ func (m *Manager) Repair(version string) error {
 // 不碰 data/ 下的任何内容。
 func (m *Manager) repair(ctx context.Context, version string, sources Sources) error {
 	dir := m.versionDir(version)
-	python := filepath.Join(dir, "Scripts", "python.exe")
+	python := venvPython(dir)
 	m.setStep("uv", "正在检查 uv", 0)
-	uv := filepath.Join(m.root, "tools", "uv-"+uvVersion+".exe")
+	uv := uvExecutable(m.root)
 	if !isFile(uv) {
 		return errors.New("缺少 uv，请重新安装该版本")
 	}

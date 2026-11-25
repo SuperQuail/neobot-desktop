@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NeoBot Desktop
+Comment=NeoBot 桌面启动器
+Exec=@EXEC@
+Icon=neobot-desktop
+Terminal=false
+Categories=Network;
+StartupWMClass=neobot-desktop

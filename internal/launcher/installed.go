@@ -73,7 +73,7 @@ func (m *Manager) scanInstalled() error {
 
 func validInstallDir(dir, name string) bool {
 	record, err := readInstallRecord(dir)
-	return err == nil && record.Name == name && isFile(filepath.Join(dir, "Scripts", "neobot.exe"))
+	return err == nil && record.Name == name && isFile(botExecutable(dir))
 }
 
 // recoverVersionDirs restores an update that was interrupted after the old

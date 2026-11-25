@@ -91,7 +91,7 @@ func (m *Manager) SetAutostart(enabled bool) error {
 	before := m.state.Autostart
 	m.mu.Unlock()
 	if err := setAutostart(enabled); err != nil {
-		return fmt.Errorf("无法更新开机自启设置（%w）；多为安全软件拦截了注册表写入，请允许后重试", err)
+		return fmt.Errorf("无法更新开机自启设置（%w）%s", err, autostartErrorHint())
 	}
 	m.mu.Lock()
 	m.state.Autostart = enabled
